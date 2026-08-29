@@ -9,9 +9,9 @@ avec un message clair. J'explique, **tu écris le code toi-même** (sauf blocage
 Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 
 ## Semaine 1 — Bases Python + premiers pas Git
-- [ ] Jour 1 : Installation de Git, configuration, premier commit ; variables & types Python
-- [ ] Jour 2 : Conditions (if/elif/else), opérateurs
-- [ ] Jour 3 : Boucles (for/while), listes
+- [x] Jour 1 : Installation de Git, configuration, premier commit ; variables & types Python
+- [x] Jour 2 : Conditions (if/elif/else), opérateurs
+- [x] Jour 3 : Boucles (for/while), listes
 - [ ] Jour 4 : Fonctions, dictionnaires
 - [ ] Jour 5 : Fichiers texte, gestion d'erreurs (try/except) ; récap + commit
 

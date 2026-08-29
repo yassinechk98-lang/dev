@@ -8,6 +8,8 @@ while compteur > 0:
     print(compteur)
     compteur -= 1
 print("Décollage !")
-
-
+villes = ["Monastir", "Tunis", "Sousse", "mehdia"]
+villes.append("Sfax")
+villes.remove("Tunis")
+print(villes)
 
