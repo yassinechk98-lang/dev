@@ -13,10 +13,10 @@ Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 - [x] Jour 2 : Conditions (if/elif/else), opérateurs
 - [x] Jour 3 : Boucles (for/while), listes
 - [x] Jour 4 : Fonctions, dictionnaires
-- [ ] Jour 5 : Fichiers texte, gestion d'erreurs (try/except) ; récap + commit
+- [x] Jour 5 : Fichiers texte, gestion d'erreurs (try/except) ; récap + commit
 
 ## Semaine 2 — Python intermédiaire + Git avancé
-- [ ] Jour 6 : Modules/imports, environnement virtuel (venv), pip
+- [x] Jour 6 : Modules/imports, environnement virtuel (venv), pip
 - [ ] Jour 7 : Programmation orientée objet — classes et objets (modéliser une "Tâche")
 - [ ] Jour 8 : POO suite — méthodes, un peu d'héritage
 - [ ] Jour 9 : Tests avec pytest (bases)
