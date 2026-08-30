@@ -24,7 +24,7 @@ Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 
 ## Semaine 3 — Backend web (API en Python)
 - [x] Jour 11 : Concepts HTTP/REST, Flask, "Hello World" API
-- [ ] Jour 12 : Endpoints CRUD (GET/POST/DELETE) pour les tâches, en mémoire
+- [x] Jour 12 : Endpoints CRUD (GET/POST/DELETE) pour les tâches, en mémoire
 - [ ] Jour 13 : Persistance des données (fichier JSON puis SQLite)
 - [ ] Jour 14 : Validation des données, gestion des erreurs API
 - [ ] Jour 15 : Tests de l'API, commit/push réguliers, récap de la semaine
