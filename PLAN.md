@@ -20,7 +20,7 @@ Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 - [x] Jour 7 : Programmation orientée objet — classes et objets (modéliser une "Tâche")
 - [x] Jour 8 : POO suite — méthodes, un peu d'héritage
 - [x] Jour 9 : Tests avec pytest (bases)
-- [ ] Jour 10 : Branches Git, merge, .gitignore, compte GitHub + dépôt distant + push
+- [x] Jour 10 : Branches Git, merge, .gitignore, compte GitHub + dépôt distant + push
 
 ## Semaine 3 — Backend web (API en Python)
 - [ ] Jour 11 : Concepts HTTP/REST, Flask, "Hello World" API
