@@ -28,6 +28,10 @@ def lister_taches():
 def creer_tache():
     global prochain_id
     data = request.get_json()
+
+    if not data or "titre" not in data or not data["titre"].strip():
+        return jsonify({"erreur": "Le champ 'titre' est requis"}), 400
+
     nouvelle_tache = {"id": prochain_id, "titre": data["titre"], "terminee": False}
     taches.append(nouvelle_tache)
     prochain_id += 1
@@ -37,6 +41,9 @@ def creer_tache():
 @app.route("/taches/<int:tache_id>", methods=["DELETE"])
 def supprimer_tache(tache_id):
     global taches
+    if not any(t["id"] == tache_id for t in taches):
+        return jsonify({"erreur": f"Aucune tache avec l'id {tache_id}"}), 404
+
     taches = [t for t in taches if t["id"] != tache_id]
     sauvegarder_taches(taches)
     return "", 204
