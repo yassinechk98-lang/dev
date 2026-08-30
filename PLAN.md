@@ -17,7 +17,7 @@ Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 
 ## Semaine 2 — Python intermédiaire + Git avancé
 - [x] Jour 6 : Modules/imports, environnement virtuel (venv), pip
-- [ ] Jour 7 : Programmation orientée objet — classes et objets (modéliser une "Tâche")
+- [x] Jour 7 : Programmation orientée objet — classes et objets (modéliser une "Tâche")
 - [ ] Jour 8 : POO suite — méthodes, un peu d'héritage
 - [ ] Jour 9 : Tests avec pytest (bases)
 - [ ] Jour 10 : Branches Git, merge, .gitignore, compte GitHub + dépôt distant + push
