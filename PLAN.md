@@ -23,7 +23,7 @@ Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 - [x] Jour 10 : Branches Git, merge, .gitignore, compte GitHub + dépôt distant + push
 
 ## Semaine 3 — Backend web (API en Python)
-- [ ] Jour 11 : Concepts HTTP/REST, Flask, "Hello World" API
+- [x] Jour 11 : Concepts HTTP/REST, Flask, "Hello World" API
 - [ ] Jour 12 : Endpoints CRUD (GET/POST/DELETE) pour les tâches, en mémoire
 - [ ] Jour 13 : Persistance des données (fichier JSON puis SQLite)
 - [ ] Jour 14 : Validation des données, gestion des erreurs API
