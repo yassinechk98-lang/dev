@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+taches.json
 
 # Node / React
 node_modules/
