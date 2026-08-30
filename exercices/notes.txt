@@ -1,0 +1,3 @@
+Maths: 15
+Francais:12
+Anglais:17
