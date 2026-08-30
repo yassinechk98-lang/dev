@@ -12,7 +12,7 @@ Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 - [x] Jour 1 : Installation de Git, configuration, premier commit ; variables & types Python
 - [x] Jour 2 : Conditions (if/elif/else), opérateurs
 - [x] Jour 3 : Boucles (for/while), listes
-- [ ] Jour 4 : Fonctions, dictionnaires
+- [x] Jour 4 : Fonctions, dictionnaires
 - [ ] Jour 5 : Fichiers texte, gestion d'erreurs (try/except) ; récap + commit
 
 ## Semaine 2 — Python intermédiaire + Git avancé
