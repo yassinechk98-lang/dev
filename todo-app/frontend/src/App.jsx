@@ -35,6 +35,14 @@ function App() {
       });
   };
 
+  const basculerTache = (id) => {
+    fetch(`${API_URL}/${id}`, { method: "PUT" })
+      .then((reponse) => reponse.json())
+      .then((tacheMaj) => {
+        setTaches(taches.map((t) => (t.id === id ? tacheMaj : t)));
+      });
+  };
+
   const supprimerTache = (id) => {
     fetch(`${API_URL}/${id}`, { method: "DELETE" }).then(() => {
       setTaches(taches.filter((t) => t.id !== id));
@@ -58,7 +66,9 @@ function App() {
       <ul>
         {taches.map((tache) => (
           <li key={tache.id}>
-            {tache.titre} {tache.terminee ? "✅" : "❌"}
+            <span onClick={() => basculerTache(tache.id)} style={{ cursor: "pointer" }}>
+              {tache.titre} {tache.terminee ? "✅" : "❌"}
+            </span>
             <button onClick={() => supprimerTache(tache.id)}>Supprimer</button>
           </li>
         ))}

@@ -40,6 +40,16 @@ def creer_tache():
     sauvegarder_taches(taches)
     return jsonify(nouvelle_tache), 201
 
+@app.route("/taches/<int:tache_id>", methods=["PUT"])
+def modifier_tache(tache_id):
+    tache = next((t for t in taches if t["id"] == tache_id), None)
+    if tache is None:
+        return jsonify({"erreur": f"Aucune tache avec l'id {tache_id}"}), 404
+
+    tache["terminee"] = not tache["terminee"]
+    sauvegarder_taches(taches)
+    return jsonify(tache)
+
 @app.route("/taches/<int:tache_id>", methods=["DELETE"])
 def supprimer_tache(tache_id):
     global taches
