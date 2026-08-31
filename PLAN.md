@@ -33,7 +33,7 @@ Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 - [x] Jour 16 : Bases JavaScript moderne (const/let, fonctions fléchées, fetch/promesses)
 - [x] Jour 17 : Créer le projet React (Vite), composants, JSX
 - [x] Jour 18 : State (useState), afficher la liste des tâches
-- [ ] Jour 19 : Connexion au backend Flask (fetch), ajouter/supprimer des tâches
+- [x] Jour 19 : Connexion au backend Flask (fetch), ajouter/supprimer des tâches
 - [ ] Jour 20 : Style, finitions, gestion des erreurs côté front
 - [ ] Jour 21-22 : Polish global, tests manuels, nettoyage de l'historique git
 - [ ] Jour 23 : Démo finale et bilan des acquis
