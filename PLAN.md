@@ -27,7 +27,7 @@ Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 - [x] Jour 12 : Endpoints CRUD (GET/POST/DELETE) pour les tâches, en mémoire
 - [x] Jour 13 : Persistance des données (fichier JSON puis SQLite)
 - [x] Jour 14 : Validation des données, gestion des erreurs API
-- [ ] Jour 15 : Tests de l'API, commit/push réguliers, récap de la semaine
+- [x] Jour 15 : Tests de l'API, commit/push réguliers, récap de la semaine
 
 ## Semaine 4 — Frontend React + intégration finale
 - [ ] Jour 16 : Bases JavaScript moderne (const/let, fonctions fléchées, fetch/promesses)
