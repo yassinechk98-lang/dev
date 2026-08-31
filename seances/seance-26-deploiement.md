@@ -62,3 +62,22 @@ séance).
 4. Build + déploie le frontend sur Netlify
 5. Teste l'app complète depuis son URL publique, sur un autre appareil si possible
    (téléphone) pour confirmer que c'est bien accessible depuis internet
+
+## Résultat final
+
+- **Frontend** : https://yassine-todo-app.netlify.app
+- **Backend** : https://dev-tpob.onrender.com (connecté à Neon PostgreSQL)
+
+## Piège rencontré : déployer le bon dossier
+
+Un déploiement Netlify a d'abord échoué (page blanche) car il avait uploadé **tout
+le dossier source** du frontend, y compris l'`index.html` de développement à la
+racine (qui référence `/src/main.jsx` directement — illisible tel quel par un
+navigateur, ça doit être transformé par le build). Netlify servait ce fichier non
+buildé au lieu du vrai `dist/index.html`.
+
+**Leçon** : toujours vérifier ce qu'un déploiement statique sert réellement — un
+`index.html` qui référence `/src/...` au lieu de `/assets/...` est le signe qu'on a
+déployé les sources plutôt que le résultat du build (`npm run build` → dossier
+`dist/`). La correction a été de déployer spécifiquement le contenu de `dist/`,
+pas tout `todo-app/frontend/`.
