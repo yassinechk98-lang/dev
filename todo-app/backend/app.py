@@ -1,63 +1,88 @@
-import json
 import os
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from sqlalchemy import create_engine, text
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-FICHIER = os.path.join(os.path.dirname(__file__), "taches.json")
+engine = create_engine(os.environ["DATABASE_URL"])
 
-def charger_taches():
-    try:
-        with open(FICHIER, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
+with engine.connect() as conn:
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS taches (
+            id SERIAL PRIMARY KEY,
+            titre TEXT NOT NULL,
+            terminee BOOLEAN DEFAULT FALSE
+        )
+    """))
+    conn.commit()
 
-def sauvegarder_taches(taches):
-    with open(FICHIER, "w") as f:
-        json.dump(taches, f, indent=2)
+def lister_taches_db():
+    with engine.connect() as conn:
+        resultat = conn.execute(text("SELECT id, titre, terminee FROM taches ORDER BY id"))
+        return [dict(row._mapping) for row in resultat]
 
-taches = charger_taches()
-prochain_id = max([t["id"] for t in taches], default=0) + 1
+def creer_tache_db(titre):
+    with engine.connect() as conn:
+        resultat = conn.execute(
+            text("INSERT INTO taches (titre) VALUES (:titre) RETURNING id, titre, terminee"),
+            {"titre": titre},
+        )
+        conn.commit()
+        return dict(resultat.fetchone()._mapping)
+
+def basculer_tache_db(tache_id):
+    with engine.connect() as conn:
+        resultat = conn.execute(
+            text("""
+                UPDATE taches SET terminee = NOT terminee
+                WHERE id = :id
+                RETURNING id, titre, terminee
+            """),
+            {"id": tache_id},
+        )
+        conn.commit()
+        ligne = resultat.fetchone()
+        return dict(ligne._mapping) if ligne else None
+
+def supprimer_tache_db(tache_id):
+    with engine.connect() as conn:
+        resultat = conn.execute(text("DELETE FROM taches WHERE id = :id"), {"id": tache_id})
+        conn.commit()
+        return resultat.rowcount > 0
 
 @app.route("/taches", methods=["GET"])
 def lister_taches():
-    return jsonify(taches)
+    return jsonify(lister_taches_db())
 
 @app.route("/taches", methods=["POST"])
 def creer_tache():
-    global prochain_id
     data = request.get_json()
 
     if not data or "titre" not in data or not data["titre"].strip():
         return jsonify({"erreur": "Le champ 'titre' est requis"}), 400
 
-    nouvelle_tache = {"id": prochain_id, "titre": data["titre"], "terminee": False}
-    taches.append(nouvelle_tache)
-    prochain_id += 1
-    sauvegarder_taches(taches)
+    nouvelle_tache = creer_tache_db(data["titre"])
     return jsonify(nouvelle_tache), 201
 
 @app.route("/taches/<int:tache_id>", methods=["PUT"])
 def modifier_tache(tache_id):
-    tache = next((t for t in taches if t["id"] == tache_id), None)
+    tache = basculer_tache_db(tache_id)
     if tache is None:
         return jsonify({"erreur": f"Aucune tache avec l'id {tache_id}"}), 404
 
-    tache["terminee"] = not tache["terminee"]
-    sauvegarder_taches(taches)
     return jsonify(tache)
 
 @app.route("/taches/<int:tache_id>", methods=["DELETE"])
 def supprimer_tache(tache_id):
-    global taches
-    if not any(t["id"] == tache_id for t in taches):
+    supprime = supprimer_tache_db(tache_id)
+    if not supprime:
         return jsonify({"erreur": f"Aucune tache avec l'id {tache_id}"}), 404
 
-    taches = [t for t in taches if t["id"] != tache_id]
-    sauvegarder_taches(taches)
     return "", 204
 
 if __name__ == "__main__":
