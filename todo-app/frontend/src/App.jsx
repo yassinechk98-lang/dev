@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const API_URL = "http://localhost:5000/taches";
+const API_URL = "https://dev-tpob.onrender.com/taches";
 
 function App() {
   const [taches, setTaches] = useState([]);

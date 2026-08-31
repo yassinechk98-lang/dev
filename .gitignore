@@ -10,6 +10,7 @@ taches.json
 node_modules/
 dist/
 build/
+.netlify/
 
 # Outils / config locale
 .claude/
