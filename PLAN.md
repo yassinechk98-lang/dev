@@ -30,7 +30,7 @@ Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 - [x] Jour 15 : Tests de l'API, commit/push réguliers, récap de la semaine
 
 ## Semaine 4 — Frontend React + intégration finale
-- [ ] Jour 16 : Bases JavaScript moderne (const/let, fonctions fléchées, fetch/promesses)
+- [x] Jour 16 : Bases JavaScript moderne (const/let, fonctions fléchées, fetch/promesses)
 - [ ] Jour 17 : Créer le projet React (Vite), composants, JSX
 - [ ] Jour 18 : State (useState), afficher la liste des tâches
 - [ ] Jour 19 : Connexion au backend Flask (fetch), ajouter/supprimer des tâches
