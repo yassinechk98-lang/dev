@@ -1,8 +1,10 @@
 import json
 import os
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 FICHIER = os.path.join(os.path.dirname(__file__), "taches.json")
 
@@ -18,7 +20,7 @@ def sauvegarder_taches(taches):
         json.dump(taches, f, indent=2)
 
 taches = charger_taches()
-prochain_id = 2
+prochain_id = max([t["id"] for t in taches], default=0) + 1
 
 @app.route("/taches", methods=["GET"])
 def lister_taches():
