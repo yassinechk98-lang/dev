@@ -5,11 +5,19 @@ const API_URL = "http://localhost:5000/taches";
 function App() {
   const [taches, setTaches] = useState([]);
   const [nouveauTitre, setNouveauTitre] = useState("");
+  const [erreur, setErreur] = useState(null);
 
   useEffect(() => {
     fetch(API_URL)
-      .then((reponse) => reponse.json())
-      .then((donnees) => setTaches(donnees));
+      .then((reponse) => {
+        if (!reponse.ok) throw new Error("Erreur serveur");
+        return reponse.json();
+      })
+      .then((donnees) => {
+        setTaches(donnees);
+        setErreur(null);
+      })
+      .catch(() => setErreur("Impossible de charger les taches. Le serveur tourne-t-il ?"));
   }, []);
 
   const ajouterTache = () => {
@@ -36,6 +44,8 @@ function App() {
   return (
     <div>
       <h1>Ma Todo-list</h1>
+
+      {erreur && <p style={{ color: "red" }}>{erreur}</p>}
 
       <input
         type="text"
