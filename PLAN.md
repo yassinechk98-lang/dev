@@ -36,7 +36,7 @@ Coche les jours au fur et à mesure : `[ ]` → `[x]`.
 - [x] Jour 19 : Connexion au backend Flask (fetch), ajouter/supprimer des tâches
 - [x] Jour 20 : Style, finitions, gestion des erreurs côté front
 - [x] Jour 21-22 : Polish global, tests manuels, nettoyage de l'historique git
-- [ ] Jour 23 : Démo finale et bilan des acquis
+- [x] Jour 23 : Démo finale et bilan des acquis
 
 ## Structure du dossier dev/
 ```
