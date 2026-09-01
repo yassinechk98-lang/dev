@@ -2,6 +2,17 @@
 
 Secrets configures : DATABASE_URL, SECRET_KEY, NETLIFY_SITE_ID, NETLIFY_AUTH_TOKEN.
 
+CI/CD operationnel depuis le 2026-09-01 : chaque push sur main lance automatiquement
+les tests backend et le deploiement frontend, sans commande manuelle.
+
+**Piege rencontre** : coller une longue valeur secrete (comme `DATABASE_URL`) depuis
+le chat dans le champ GitHub a introduit un retour a la ligne invisible au milieu du
+texte, cassant le parsing de la chaine de connexion (erreur
+`invalid connection option "ng"`, la valeur ayant ete coupee en plein milieu de
+`channel_binding`). Solution : mettre la valeur exacte dans le presse-papiers
+directement (`Set-Clipboard` en PowerShell) plutot que de compter sur une
+selection manuelle de texte affiche dans le chat.
+
 ## Théorie — c'est quoi CI/CD ?
 
 - **CI** (Continuous Integration) : à chaque push, une machine distante (pas la
