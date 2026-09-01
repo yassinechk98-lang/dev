@@ -1,39 +1,56 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
+import { Typography, TextField, Button, Alert, Link, Stack } from '@mui/material';
+import MailLockIcon from '@mui/icons-material/MailLock';
 import { motDePasseOublie } from '../api';
+import AuthLayout from '../AuthLayout';
 
-function ForgotPasswordPage() {
+function ForgotPasswordPage({ mode, basculerMode }) {
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState(null);
+  const [envoye, setEnvoye] = useState(false);
+  const [chargement, setChargement] = useState(false);
 
   const envoyer = () => {
-    motDePasseOublie(email).then(() => {
-      setMessage("Si ce compte existe, un email de reinitialisation a ete envoye. Verifie ta boite mail (et les spams).");
-    });
+    setChargement(true);
+    motDePasseOublie(email)
+      .then(() => setEnvoye(true))
+      .finally(() => setChargement(false));
   };
 
   return (
-    <div className="carte">
-      <h1>Mot de passe oublie</h1>
+    <AuthLayout mode={mode} basculerMode={basculerMode}>
+      <Stack spacing={0.5} alignItems="center" sx={{ mb: 3 }}>
+        <MailLockIcon color="primary" sx={{ fontSize: 40 }} />
+        <Typography variant="h5" fontWeight={700}>Mot de passe oublie</Typography>
+      </Stack>
 
-      {message ? (
-        <p>{message}</p>
+      {envoye ? (
+        <Alert severity="success">
+          Si ce compte existe, un email de reinitialisation a ete envoye. Verifie ta boite mail (et les spams).
+        </Alert>
       ) : (
-        <>
-          <input
-            type="text"
+        <Stack spacing={2}>
+          <TextField
+            label="Ton email"
+            type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Ton email"
+            fullWidth
+            autoFocus
+            onKeyDown={(e) => e.key === "Enter" && envoyer()}
           />
-          <button onClick={envoyer}>Envoyer le lien de reinitialisation</button>
-        </>
+          <Button variant="contained" size="large" onClick={envoyer} loading={chargement} disabled={!email}>
+            Envoyer le lien
+          </Button>
+        </Stack>
       )}
 
-      <p className="lien">
-        <Link to="/login">Retour a la connexion</Link>
-      </p>
-    </div>
+      <Stack sx={{ mt: 3 }} alignItems="center">
+        <Link component={RouterLink} to="/login" variant="body2">
+          Retour a la connexion
+        </Link>
+      </Stack>
+    </AuthLayout>
   );
 }
 

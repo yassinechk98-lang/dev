@@ -42,7 +42,8 @@ def initialiser_schema():
             )
         """))
         conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)"))
-        conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS date_echeance DATE"))
+        conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS date_echeance TIMESTAMP"))
+        conn.execute(text("ALTER TABLE taches ALTER COLUMN date_echeance TYPE TIMESTAMP"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_taches_user_id ON taches (user_id)"))
         conn.commit()
 
