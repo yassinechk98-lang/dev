@@ -1,5 +1,8 @@
 # Séance 32 (bonus, hors plan initial) — Mot de passe oublié (email)
 
+Note : apres blocage sur Gmail SMTP (bloque par Render) et Brevo/Resend
+(verification telephone), migre vers l'API Mailjet (HTTP, sans SMTP).
+
 ## Théorie — le flux "mot de passe oublié"
 
 1. L'utilisateur indique son email sur une page dédiée
