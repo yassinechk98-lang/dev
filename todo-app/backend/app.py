@@ -1,10 +1,9 @@
 import os
-import smtplib
 from datetime import datetime, timedelta, timezone
-from email.mime.text import MIMEText
 from functools import wraps
 
 import jwt
+import requests
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -17,8 +16,9 @@ app = Flask(__name__)
 CORS(app)
 
 SECRET_KEY = os.environ["SECRET_KEY"]
-GMAIL_USER = os.environ["GMAIL_USER"]
-GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
+MAILJET_API_KEY = os.environ["MAILJET_API_KEY"]
+MAILJET_SECRET_KEY = os.environ["MAILJET_SECRET_KEY"]
+MAIL_FROM = os.environ["MAIL_FROM"]
 FRONTEND_URL = os.environ["FRONTEND_URL"]
 engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
 
@@ -63,15 +63,22 @@ def generer_token_reset(user_id):
     )
 
 def envoyer_email(destinataire, sujet, html):
-    message = MIMEText(html, "html")
-    message["Subject"] = sujet
-    message["From"] = GMAIL_USER
-    message["To"] = destinataire
-
-    with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as serveur:
-        serveur.starttls()
-        serveur.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        serveur.sendmail(GMAIL_USER, destinataire, message.as_string())
+    reponse = requests.post(
+        "https://api.mailjet.com/v3.1/send",
+        auth=(MAILJET_API_KEY, MAILJET_SECRET_KEY),
+        json={
+            "Messages": [
+                {
+                    "From": {"Email": MAIL_FROM, "Name": "Ma Todo-list"},
+                    "To": [{"Email": destinataire}],
+                    "Subject": sujet,
+                    "HTMLPart": html,
+                }
+            ]
+        },
+        timeout=10,
+    )
+    reponse.raise_for_status()
 
 def token_requis(f):
     @wraps(f)
