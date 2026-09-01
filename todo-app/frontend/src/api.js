@@ -38,14 +38,14 @@ export function getTaches(token) {
   });
 }
 
-export function creerTache(token, titre) {
+export function creerTache(token, titre, dateEcheance) {
   return fetch(`${BASE_URL}/taches`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ titre }),
+    body: JSON.stringify({ titre, date_echeance: dateEcheance }),
   });
 }
 

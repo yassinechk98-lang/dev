@@ -2,9 +2,21 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getTaches, creerTache, basculerTache, supprimerTache } from '../api';
 
+function estEnRetard(tache) {
+  if (!tache.date_echeance || tache.terminee) return false;
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  return tache.date_echeance < aujourdhui;
+}
+
+function formaterDate(dateIso) {
+  const [annee, mois, jour] = dateIso.split("-");
+  return `${jour}/${mois}/${annee}`;
+}
+
 function TodosPage({ token, setToken }) {
   const [taches, setTaches] = useState([]);
   const [nouveauTitre, setNouveauTitre] = useState("");
+  const [nouvelleDate, setNouvelleDate] = useState("");
   const [erreur, setErreur] = useState(null);
   const [chargement, setChargement] = useState(true);
   const navigate = useNavigate();
@@ -32,11 +44,12 @@ function TodosPage({ token, setToken }) {
   const ajouterTache = () => {
     if (!nouveauTitre.trim()) return;
 
-    creerTache(token, nouveauTitre)
+    creerTache(token, nouveauTitre, nouvelleDate)
       .then((reponse) => reponse.json())
       .then((tache) => {
         setTaches([...taches, tache]);
         setNouveauTitre("");
+        setNouvelleDate("");
       });
   };
 
@@ -73,6 +86,12 @@ function TodosPage({ token, setToken }) {
           placeholder="Nouvelle tache"
           onKeyDown={(e) => e.key === "Enter" && ajouterTache()}
         />
+        <input
+          type="date"
+          className="champ-date"
+          value={nouvelleDate}
+          onChange={(e) => setNouvelleDate(e.target.value)}
+        />
         <button onClick={ajouterTache}>Ajouter</button>
       </div>
 
@@ -88,6 +107,12 @@ function TodosPage({ token, setToken }) {
               <span className="texte-tache" onClick={() => basculer(tache.id)}>
                 {tache.titre}{" "}
                 <span className="emoji">{tache.terminee ? "✅" : "❌"}</span>
+                {tache.date_echeance && (
+                  <span className={`date-echeance${estEnRetard(tache) ? " en-retard" : ""}`}>
+                    {" "}
+                    {formaterDate(tache.date_echeance)}
+                  </span>
+                )}
               </span>
               <button className="bouton-supprimer" onClick={() => supprimer(tache.id)}>
                 Supprimer

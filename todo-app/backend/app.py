@@ -39,6 +39,7 @@ with engine.connect() as conn:
         )
     """))
     conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)"))
+    conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS date_echeance DATE"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_taches_user_id ON taches (user_id)"))
     conn.commit()
 
@@ -182,26 +183,32 @@ def login():
 
 # ---------- taches (scopees par utilisateur) ----------
 
+def formater_tache(ligne):
+    tache = dict(ligne._mapping)
+    if tache.get("date_echeance"):
+        tache["date_echeance"] = tache["date_echeance"].isoformat()
+    return tache
+
 def lister_taches_db(user_id):
     with engine.connect() as conn:
         resultat = conn.execute(
-            text("SELECT id, titre, terminee FROM taches WHERE user_id = :uid ORDER BY id"),
+            text("SELECT id, titre, terminee, date_echeance FROM taches WHERE user_id = :uid ORDER BY id"),
             {"uid": user_id},
         )
-        return [dict(row._mapping) for row in resultat]
+        return [formater_tache(ligne) for ligne in resultat]
 
-def creer_tache_db(user_id, titre):
+def creer_tache_db(user_id, titre, date_echeance):
     with engine.connect() as conn:
         resultat = conn.execute(
             text("""
-                INSERT INTO taches (titre, terminee, user_id)
-                VALUES (:titre, FALSE, :uid)
-                RETURNING id, titre, terminee
+                INSERT INTO taches (titre, terminee, user_id, date_echeance)
+                VALUES (:titre, FALSE, :uid, :date_echeance)
+                RETURNING id, titre, terminee, date_echeance
             """),
-            {"titre": titre, "uid": user_id},
+            {"titre": titre, "uid": user_id, "date_echeance": date_echeance},
         )
         conn.commit()
-        return dict(resultat.fetchone()._mapping)
+        return formater_tache(resultat.fetchone())
 
 def basculer_tache_db(user_id, tache_id):
     with engine.connect() as conn:
@@ -209,13 +216,13 @@ def basculer_tache_db(user_id, tache_id):
             text("""
                 UPDATE taches SET terminee = NOT terminee
                 WHERE id = :id AND user_id = :uid
-                RETURNING id, titre, terminee
+                RETURNING id, titre, terminee, date_echeance
             """),
             {"id": tache_id, "uid": user_id},
         )
         conn.commit()
         ligne = resultat.fetchone()
-        return dict(ligne._mapping) if ligne else None
+        return formater_tache(ligne) if ligne else None
 
 def supprimer_tache_db(user_id, tache_id):
     with engine.connect() as conn:
@@ -239,7 +246,7 @@ def creer_tache(user_id):
     if not data or "titre" not in data or not data["titre"].strip():
         return jsonify({"erreur": "Le champ 'titre' est requis"}), 400
 
-    nouvelle_tache = creer_tache_db(user_id, data["titre"])
+    nouvelle_tache = creer_tache_db(user_id, data["titre"], data.get("date_echeance") or None)
     return jsonify(nouvelle_tache), 201
 
 @app.route("/taches/<int:tache_id>", methods=["PUT"])
