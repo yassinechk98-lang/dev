@@ -6,6 +6,7 @@ function TodosPage({ token, setToken }) {
   const [taches, setTaches] = useState([]);
   const [nouveauTitre, setNouveauTitre] = useState("");
   const [erreur, setErreur] = useState(null);
+  const [chargement, setChargement] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,7 +19,8 @@ function TodosPage({ token, setToken }) {
         setTaches(donnees);
         setErreur(null);
       })
-      .catch(() => setErreur("Impossible de charger les taches. Le serveur tourne-t-il ?"));
+      .catch(() => setErreur("Impossible de charger les taches. Le serveur tourne-t-il ?"))
+      .finally(() => setChargement(false));
   }, [token]);
 
   const deconnexion = () => {
@@ -68,16 +70,20 @@ function TodosPage({ token, setToken }) {
       />
       <button onClick={ajouterTache}>Ajouter</button>
 
-      <ul>
-        {taches.map((tache) => (
-          <li key={tache.id}>
-            <span onClick={() => basculer(tache.id)} style={{ cursor: "pointer" }}>
-              {tache.titre} {tache.terminee ? "✅" : "❌"}
-            </span>
-            <button onClick={() => supprimer(tache.id)}>Supprimer</button>
-          </li>
-        ))}
-      </ul>
+      {chargement ? (
+        <p>Chargement des taches...</p>
+      ) : (
+        <ul>
+          {taches.map((tache) => (
+            <li key={tache.id}>
+              <span onClick={() => basculer(tache.id)} style={{ cursor: "pointer" }}>
+                {tache.titre} {tache.terminee ? "✅" : "❌"}
+              </span>
+              <button onClick={() => supprimer(tache.id)}>Supprimer</button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
