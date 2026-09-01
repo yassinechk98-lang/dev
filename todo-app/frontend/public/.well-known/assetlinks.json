@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.netlify.yassine_todo_app.twa",
+        "sha256_cert_fingerprints": ["8E:89:11:B8:B2:C9:39:FB:75:73:4F:7A:56:7B:0A:69:73:85:BB:42:45:0D:CE:5F:AC:2B:1C:86:44:E2:9E:95"]
+      }
+    }]
