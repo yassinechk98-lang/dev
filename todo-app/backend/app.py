@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -8,6 +9,7 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from werkzeug.security import generate_password_hash, check_password_hash
 
 load_dotenv()
@@ -22,26 +24,39 @@ MAIL_FROM = os.environ["MAIL_FROM"]
 FRONTEND_URL = os.environ["FRONTEND_URL"]
 engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
 
-with engine.connect() as conn:
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL
-        )
-    """))
-    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE"))
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS taches (
-            id SERIAL PRIMARY KEY,
-            titre TEXT NOT NULL,
-            terminee BOOLEAN DEFAULT FALSE
-        )
-    """))
-    conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)"))
-    conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS date_echeance DATE"))
-    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_taches_user_id ON taches (user_id)"))
-    conn.commit()
+def initialiser_schema():
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL
+            )
+        """))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE"))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS taches (
+                id SERIAL PRIMARY KEY,
+                titre TEXT NOT NULL,
+                terminee BOOLEAN DEFAULT FALSE
+            )
+        """))
+        conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)"))
+        conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS date_echeance DATE"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_taches_user_id ON taches (user_id)"))
+        conn.commit()
+
+# Neon (base gratuite) peut mettre quelques secondes a "reveiller" la base au
+# tout premier appel apres une periode d'inactivite. On retente plusieurs fois
+# pour eviter qu'un demarrage lent ne fasse planter tout le deploiement.
+for tentative in range(5):
+    try:
+        initialiser_schema()
+        break
+    except OperationalError:
+        if tentative == 4:
+            raise
+        time.sleep(3)
 
 # ---------- authentification ----------
 
