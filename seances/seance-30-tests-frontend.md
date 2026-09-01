@@ -63,3 +63,20 @@ test('le champ se met a jour quand on tape', () => {
 3. Écrire quelques tests sur `LoginPage` et `RouteProtegee`
 4. Ajouter les tests frontend au CI (GitHub Actions), avant le déploiement — si les
    tests échouent, le déploiement ne doit pas se faire
+
+## Pieges rencontres
+
+1. **Timeout de demarrage des workers Vitest** en local : passer par `pool: 'forks'`
+   avec `fileParallelism: false` (syntaxe Vitest 4, `poolOptions` imbrique est
+   deprecie) a regle le probleme.
+2. **`webidl.util.markAsUncloneable is not a function`** sur GitHub Actions
+   uniquement (jamais en local) : un bug de compatibilite entre `jsdom`
+   (dependance de `undici`) et une version tres recente de Node.js (24, forcee par
+   GitHub car Node 20 est deprecie sur les runners). Solution : fixer explicitement
+   `node-version: "22"` (LTS stable) dans le workflow plutot que de laisser GitHub
+   choisir une version potentiellement trop recente et moins testee.
+
+**Lecon generale** : un test qui passe en local peut echouer en CI a cause de
+differences d'environnement (version de Node, OS, variables...) — c'est justement
+la valeur du CI, qui detecte ces divergences avant qu'elles n'affectent la
+production.
