@@ -13,7 +13,9 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import EventIcon from '@mui/icons-material/Event';
 import ChecklistRtlIcon from '@mui/icons-material/ChecklistRtl';
 import AddIcon from '@mui/icons-material/Add';
-import { getTaches, creerTache, basculerTache, supprimerTache } from '../api';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
+import { getTaches, creerTache, basculerTache, supprimerTache, getVapidPublicKey, pushSubscribe } from '../api';
 
 function estEnRetard(tache) {
   if (!tache.date_echeance || tache.terminee) return false;
@@ -31,6 +33,13 @@ function formaterDate(dateIso) {
   });
 }
 
+function urlBase64ToUint8Array(base64) {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const base64Safe = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const brut = atob(base64Safe);
+  return Uint8Array.from([...brut].map((c) => c.charCodeAt(0)));
+}
+
 function TodosPage({ token, setToken, mode, basculerMode }) {
   const [taches, setTaches] = useState([]);
   const [nouveauTitre, setNouveauTitre] = useState("");
@@ -40,7 +49,40 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
   const [filtre, setFiltre] = useState("toutes");
   const [aSupprimer, setASupprimer] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [notifsActivees, setNotifsActivees] = useState(false);
+  const [notifsSupportees, setNotifsSupportees] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setNotifsSupportees(false);
+      return;
+    }
+    navigator.serviceWorker.ready
+      .then((registration) => registration.pushManager.getSubscription())
+      .then((subscription) => setNotifsActivees(!!subscription))
+      .catch(() => {});
+  }, []);
+
+  const activerNotifications = async () => {
+    if (Notification.permission === "denied") {
+      setNotification("Notifications bloquees dans les reglages du navigateur");
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return;
+
+    const registration = await navigator.serviceWorker.ready;
+    const { publicKey } = await getVapidPublicKey();
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+
+    await pushSubscribe(token, subscription.toJSON());
+    setNotifsActivees(true);
+    setNotification("Notifications activees");
+  };
 
   useEffect(() => {
     getTaches(token)
@@ -108,6 +150,15 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
           <Typography variant="h6" sx={{ flexGrow: 1 }} fontWeight={700}>
             Ma Todo-list
           </Typography>
+          {notifsSupportees && (
+            <Tooltip title={notifsActivees ? "Rappels actives" : "Activer les rappels"}>
+              <span>
+                <IconButton color="inherit" onClick={activerNotifications} disabled={notifsActivees}>
+                  {notifsActivees ? <NotificationsActiveIcon /> : <NotificationsNoneIcon />}
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
           <Tooltip title={mode === 'light' ? 'Mode sombre' : 'Mode clair'}>
             <IconButton color="inherit" onClick={basculerMode}>
               {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}

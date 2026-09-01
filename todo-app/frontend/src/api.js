@@ -62,3 +62,29 @@ export function supprimerTache(token, id) {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+export function getVapidPublicKey() {
+  return fetch(`${BASE_URL}/vapid-public-key`).then((r) => r.json());
+}
+
+export function pushSubscribe(token, subscription) {
+  return fetch(`${BASE_URL}/push-subscribe`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(subscription),
+  });
+}
+
+export function pushUnsubscribe(token, endpoint) {
+  return fetch(`${BASE_URL}/push-unsubscribe`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ endpoint }),
+  });
+}

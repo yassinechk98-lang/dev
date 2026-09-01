@@ -1,0 +1,16 @@
+name: Verifie les rappels de taches
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appelle l'endpoint de verification des rappels
+        run: |
+          curl -sf -X POST https://dev-tpob.onrender.com/check-reminders \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            --max-time 90

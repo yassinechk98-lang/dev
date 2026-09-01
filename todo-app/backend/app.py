@@ -3,11 +3,14 @@ import time
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
+import json
+
 import jwt
 import requests
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from pywebpush import webpush, WebPushException
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -22,6 +25,9 @@ MAILJET_API_KEY = os.environ["MAILJET_API_KEY"]
 MAILJET_SECRET_KEY = os.environ["MAILJET_SECRET_KEY"]
 MAIL_FROM = os.environ["MAIL_FROM"]
 FRONTEND_URL = os.environ["FRONTEND_URL"]
+VAPID_PRIVATE_KEY = os.environ["VAPID_PRIVATE_KEY"]
+VAPID_PUBLIC_KEY = os.environ["VAPID_PUBLIC_KEY"]
+CRON_SECRET = os.environ["CRON_SECRET"]
 engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
 
 def initialiser_schema():
@@ -44,7 +50,17 @@ def initialiser_schema():
         conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)"))
         conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS date_echeance TIMESTAMP"))
         conn.execute(text("ALTER TABLE taches ALTER COLUMN date_echeance TYPE TIMESTAMP"))
+        conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS rappel_envoye BOOLEAN DEFAULT FALSE"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_taches_user_id ON taches (user_id)"))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                endpoint TEXT UNIQUE NOT NULL,
+                p256dh TEXT NOT NULL,
+                auth TEXT NOT NULL
+            )
+        """))
         conn.commit()
 
 # Neon (base gratuite) peut mettre quelques secondes a "reveiller" la base au
@@ -282,6 +298,112 @@ def supprimer_tache(user_id, tache_id):
         return jsonify({"erreur": f"Aucune tache avec l'id {tache_id}"}), 404
 
     return "", 204
+
+# ---------- notifications push ----------
+
+@app.route("/vapid-public-key", methods=["GET"])
+def vapid_public_key():
+    return jsonify({"publicKey": VAPID_PUBLIC_KEY})
+
+@app.route("/push-subscribe", methods=["POST"])
+@token_requis
+def push_subscribe(user_id):
+    data = request.get_json()
+    if not data or not data.get("endpoint") or not data.get("keys"):
+        return jsonify({"erreur": "abonnement invalide"}), 400
+
+    with engine.connect() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+                VALUES (:uid, :endpoint, :p256dh, :auth)
+                ON CONFLICT (endpoint) DO UPDATE
+                SET user_id = :uid, p256dh = :p256dh, auth = :auth
+            """),
+            {
+                "uid": user_id,
+                "endpoint": data["endpoint"],
+                "p256dh": data["keys"]["p256dh"],
+                "auth": data["keys"]["auth"],
+            },
+        )
+        conn.commit()
+
+    return jsonify({"message": "Abonnement enregistre"}), 201
+
+@app.route("/push-unsubscribe", methods=["POST"])
+@token_requis
+def push_unsubscribe(user_id):
+    data = request.get_json()
+    if not data or not data.get("endpoint"):
+        return jsonify({"erreur": "endpoint requis"}), 400
+
+    with engine.connect() as conn:
+        conn.execute(
+            text("DELETE FROM push_subscriptions WHERE endpoint = :endpoint AND user_id = :uid"),
+            {"endpoint": data["endpoint"], "uid": user_id},
+        )
+        conn.commit()
+
+    return "", 204
+
+def envoyer_notification(subscription, titre, corps):
+    subscription_info = {
+        "endpoint": subscription.endpoint,
+        "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
+    }
+    try:
+        webpush(
+            subscription_info=subscription_info,
+            data=json.dumps({"title": titre, "body": corps}),
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_claims={"sub": f"mailto:{MAIL_FROM}"},
+        )
+        return True
+    except WebPushException as e:
+        statut = e.response.status_code if e.response is not None else None
+        if statut in (404, 410):
+            # abonnement expire ou desinstalle : on le supprime
+            with engine.connect() as conn:
+                conn.execute(
+                    text("DELETE FROM push_subscriptions WHERE endpoint = :endpoint"),
+                    {"endpoint": subscription.endpoint},
+                )
+                conn.commit()
+        return False
+
+@app.route("/check-reminders", methods=["POST"])
+def check_reminders():
+    if request.headers.get("X-Cron-Secret") != CRON_SECRET:
+        return jsonify({"erreur": "non autorise"}), 401
+
+    with engine.connect() as conn:
+        taches_a_notifier = conn.execute(text("""
+            SELECT id, user_id, titre FROM taches
+            WHERE date_echeance IS NOT NULL
+              AND date_echeance <= NOW()
+              AND terminee = FALSE
+              AND rappel_envoye = FALSE
+        """)).fetchall()
+
+        notifiees = 0
+        for tache in taches_a_notifier:
+            abonnements = conn.execute(
+                text("SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = :uid"),
+                {"uid": tache.user_id},
+            ).fetchall()
+
+            for abonnement in abonnements:
+                if envoyer_notification(abonnement, "Tache en retard", tache.titre):
+                    notifiees += 1
+
+            conn.execute(
+                text("UPDATE taches SET rappel_envoye = TRUE WHERE id = :id"),
+                {"id": tache.id},
+            )
+            conn.commit()
+
+    return jsonify({"taches_verifiees": len(taches_a_notifier), "notifications_envoyees": notifiees})
 
 if __name__ == "__main__":
     app.run(debug=True)
