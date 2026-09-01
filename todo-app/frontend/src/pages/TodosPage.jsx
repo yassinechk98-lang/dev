@@ -55,31 +55,43 @@ function TodosPage({ token, setToken }) {
   };
 
   return (
-    <div>
-      <h1>Ma Todo-list</h1>
+    <div className="carte">
+      <div className="entete-taches">
+        <h1>Ma Todo-list</h1>
+        <button className="bouton-deconnexion" onClick={deconnexion}>
+          Deconnexion
+        </button>
+      </div>
 
-      <button onClick={deconnexion}>Deconnexion</button>
+      {erreur && <p className="message-erreur">{erreur}</p>}
 
-      {erreur && <p style={{ color: "red" }}>{erreur}</p>}
-
-      <input
-        type="text"
-        value={nouveauTitre}
-        onChange={(e) => setNouveauTitre(e.target.value)}
-        placeholder="Nouvelle tache"
-      />
-      <button onClick={ajouterTache}>Ajouter</button>
+      <div className="ajout-tache">
+        <input
+          type="text"
+          value={nouveauTitre}
+          onChange={(e) => setNouveauTitre(e.target.value)}
+          placeholder="Nouvelle tache"
+          onKeyDown={(e) => e.key === "Enter" && ajouterTache()}
+        />
+        <button onClick={ajouterTache}>Ajouter</button>
+      </div>
 
       {chargement ? (
-        <p>Chargement des taches...</p>
+        <div className="chargement">
+          <div className="spinner"></div>
+          <p>Chargement des taches...</p>
+        </div>
       ) : (
         <ul>
           {taches.map((tache) => (
             <li key={tache.id}>
-              <span onClick={() => basculer(tache.id)} style={{ cursor: "pointer" }}>
-                {tache.titre} {tache.terminee ? "✅" : "❌"}
+              <span className="texte-tache" onClick={() => basculer(tache.id)}>
+                {tache.titre}{" "}
+                <span className="emoji">{tache.terminee ? "✅" : "❌"}</span>
               </span>
-              <button onClick={() => supprimer(tache.id)}>Supprimer</button>
+              <button className="bouton-supprimer" onClick={() => supprimer(tache.id)}>
+                Supprimer
+              </button>
             </li>
           ))}
         </ul>

@@ -11,8 +11,12 @@ def client():
 
 @pytest.fixture
 def token(client):
-    username = f"test_{uuid.uuid4().hex[:8]}"
-    reponse = client.post("/register", json={"username": username, "password": "motdepasse"})
+    suffixe = uuid.uuid4().hex[:8]
+    reponse = client.post("/register", json={
+        "username": f"test_{suffixe}",
+        "email": f"test_{suffixe}@example.com",
+        "password": "motdepasse",
+    })
     return reponse.get_json()["token"]
 
 @pytest.fixture

@@ -4,13 +4,14 @@ import { register } from '../api';
 
 function RegisterPage({ setToken }) {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [erreur, setErreur] = useState(null);
   const navigate = useNavigate();
 
   const creerCompte = () => {
     setErreur(null);
-    register(username, password)
+    register(username, email, password)
       .then(async (reponse) => {
         const donnees = await reponse.json();
         if (!reponse.ok) throw new Error(donnees.erreur || "Erreur");
@@ -22,16 +23,22 @@ function RegisterPage({ setToken }) {
   };
 
   return (
-    <div>
+    <div className="carte">
       <h1>Creer un compte</h1>
 
-      {erreur && <p style={{ color: "red" }}>{erreur}</p>}
+      {erreur && <p className="message-erreur">{erreur}</p>}
 
       <input
         type="text"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
         placeholder="Nom d'utilisateur"
+      />
+      <input
+        type="text"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
       />
       <input
         type="password"
@@ -41,7 +48,7 @@ function RegisterPage({ setToken }) {
       />
       <button onClick={creerCompte}>Creer le compte</button>
 
-      <p>
+      <p className="lien">
         Deja un compte ? <Link to="/login">Se connecter</Link>
       </p>
     </div>

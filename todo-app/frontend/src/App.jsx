@@ -5,6 +5,8 @@ import RouteProtegee from './RouteProtegee';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const TodosPage = lazy(() => import('./pages/TodosPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -15,6 +17,8 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage setToken={setToken} />} />
           <Route path="/register" element={<RegisterPage setToken={setToken} />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
             path="/taches"
             element={

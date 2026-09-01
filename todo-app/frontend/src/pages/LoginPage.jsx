@@ -22,10 +22,10 @@ function LoginPage({ setToken }) {
   };
 
   return (
-    <div>
+    <div className="carte">
       <h1>Connexion</h1>
 
-      {erreur && <p style={{ color: "red" }}>{erreur}</p>}
+      {erreur && <p className="message-erreur">{erreur}</p>}
 
       <input
         type="text"
@@ -41,7 +41,10 @@ function LoginPage({ setToken }) {
       />
       <button onClick={seConnecter}>Se connecter</button>
 
-      <p>
+      <p className="lien">
+        <Link to="/forgot-password">Mot de passe oublie ?</Link>
+      </p>
+      <p className="lien">
         Pas encore de compte ? <Link to="/register">Creer un compte</Link>
       </p>
     </div>

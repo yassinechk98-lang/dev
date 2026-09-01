@@ -1,5 +1,7 @@
 import os
+import smtplib
 from datetime import datetime, timedelta, timezone
+from email.mime.text import MIMEText
 from functools import wraps
 
 import jwt
@@ -15,7 +17,10 @@ app = Flask(__name__)
 CORS(app)
 
 SECRET_KEY = os.environ["SECRET_KEY"]
-engine = create_engine(os.environ["DATABASE_URL"])
+GMAIL_USER = os.environ["GMAIL_USER"]
+GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
+FRONTEND_URL = os.environ["FRONTEND_URL"]
+engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
 
 with engine.connect() as conn:
     conn.execute(text("""
@@ -25,6 +30,7 @@ with engine.connect() as conn:
             password_hash TEXT NOT NULL
         )
     """))
+    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE"))
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS taches (
             id SERIAL PRIMARY KEY,
@@ -45,6 +51,27 @@ def generer_token(user_id):
         algorithm="HS256",
     )
 
+def generer_token_reset(user_id):
+    return jwt.encode(
+        {
+            "user_id": user_id,
+            "type": "reset",
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
+        },
+        SECRET_KEY,
+        algorithm="HS256",
+    )
+
+def envoyer_email(destinataire, sujet, html):
+    message = MIMEText(html, "html")
+    message["Subject"] = sujet
+    message["From"] = GMAIL_USER
+    message["To"] = destinataire
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as serveur:
+        serveur.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        serveur.sendmail(GMAIL_USER, destinataire, message.as_string())
+
 def token_requis(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -61,24 +88,72 @@ def token_requis(f):
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
-    if not data or not data.get("username") or not data.get("password"):
-        return jsonify({"erreur": "username et password requis"}), 400
+    if not data or not data.get("username") or not data.get("password") or not data.get("email"):
+        return jsonify({"erreur": "username, email et password requis"}), 400
 
     with engine.connect() as conn:
         existe = conn.execute(
-            text("SELECT id FROM users WHERE username = :u"), {"u": data["username"]}
+            text("SELECT id FROM users WHERE username = :u OR email = :e"),
+            {"u": data["username"], "e": data["email"]},
         ).fetchone()
         if existe:
-            return jsonify({"erreur": "Ce nom d'utilisateur existe deja"}), 400
+            return jsonify({"erreur": "Ce nom d'utilisateur ou cet email existe deja"}), 400
 
         resultat = conn.execute(
-            text("INSERT INTO users (username, password_hash) VALUES (:u, :p) RETURNING id"),
-            {"u": data["username"], "p": generate_password_hash(data["password"])},
+            text("""
+                INSERT INTO users (username, email, password_hash)
+                VALUES (:u, :e, :p) RETURNING id
+            """),
+            {"u": data["username"], "e": data["email"], "p": generate_password_hash(data["password"])},
         )
         conn.commit()
         user_id = resultat.fetchone()[0]
 
     return jsonify({"token": generer_token(user_id)}), 201
+
+@app.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    data = request.get_json()
+    if not data or not data.get("email"):
+        return jsonify({"erreur": "email requis"}), 400
+
+    with engine.connect() as conn:
+        ligne = conn.execute(
+            text("SELECT id FROM users WHERE email = :e"), {"e": data["email"]}
+        ).fetchone()
+
+    if ligne:
+        token = generer_token_reset(ligne.id)
+        lien = f"{FRONTEND_URL}/reset-password?token={token}"
+        envoyer_email(
+            data["email"],
+            "Reinitialisation de mot de passe - Ma Todo-list",
+            f'<p>Clique sur ce lien pour choisir un nouveau mot de passe (valable 30 minutes) :</p><p><a href="{lien}">{lien}</a></p>',
+        )
+
+    return jsonify({"message": "Si ce compte existe, un email a ete envoye."})
+
+@app.route("/reset-password", methods=["POST"])
+def reset_password():
+    data = request.get_json()
+    if not data or not data.get("token") or not data.get("password"):
+        return jsonify({"erreur": "token et password requis"}), 400
+
+    try:
+        donnees = jwt.decode(data["token"], SECRET_KEY, algorithms=["HS256"])
+        if donnees.get("type") != "reset":
+            raise jwt.InvalidTokenError
+    except jwt.InvalidTokenError:
+        return jsonify({"erreur": "Lien invalide ou expire"}), 400
+
+    with engine.connect() as conn:
+        conn.execute(
+            text("UPDATE users SET password_hash = :p WHERE id = :id"),
+            {"p": generate_password_hash(data["password"]), "id": donnees["user_id"]},
+        )
+        conn.commit()
+
+    return jsonify({"message": "Mot de passe mis a jour"})
 
 @app.route("/login", methods=["POST"])
 def login():
