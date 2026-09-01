@@ -1,5 +1,7 @@
 # Séance 29 (bonus, hors plan initial) — CI/CD avec GitHub Actions
 
+Secrets configures : DATABASE_URL, SECRET_KEY, NETLIFY_SITE_ID, NETLIFY_AUTH_TOKEN.
+
 ## Théorie — c'est quoi CI/CD ?
 
 - **CI** (Continuous Integration) : à chaque push, une machine distante (pas la
