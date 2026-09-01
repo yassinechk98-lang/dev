@@ -20,6 +20,9 @@ jobs:
       - name: Installe les dependances
         run: npm ci
 
+      - name: Lance les tests
+        run: npm run test
+
       - name: Build
         run: npm run build
 
