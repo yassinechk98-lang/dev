@@ -68,7 +68,8 @@ def envoyer_email(destinataire, sujet, html):
     message["From"] = GMAIL_USER
     message["To"] = destinataire
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as serveur:
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as serveur:
+        serveur.starttls()
         serveur.login(GMAIL_USER, GMAIL_APP_PASSWORD)
         serveur.sendmail(GMAIL_USER, destinataire, message.as_string())
 
