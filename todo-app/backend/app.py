@@ -17,10 +17,6 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-@app.route("/version")
-def version():
-    return jsonify({"marqueur": "DATE-ECHEANCE-DEBUG-v1"})
-
 SECRET_KEY = os.environ["SECRET_KEY"]
 MAILJET_API_KEY = os.environ["MAILJET_API_KEY"]
 MAILJET_SECRET_KEY = os.environ["MAILJET_SECRET_KEY"]
