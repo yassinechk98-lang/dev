@@ -8,6 +8,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const TodosPage = lazy(() => import('./pages/TodosPage'));
 const StatsPage = lazy(() => import('./pages/StatsPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 
@@ -56,6 +57,14 @@ function App() {
               element={
                 <RouteProtegee token={token}>
                   <StatsPage />
+                </RouteProtegee>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <RouteProtegee token={token}>
+                  <AdminPage />
                 </RouteProtegee>
               }
             />

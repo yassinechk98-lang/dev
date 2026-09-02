@@ -29,6 +29,7 @@ VAPID_PRIVATE_KEY = os.environ["VAPID_PRIVATE_KEY"]
 VAPID_PUBLIC_KEY = os.environ["VAPID_PUBLIC_KEY"]
 CRON_SECRET = os.environ["CRON_SECRET"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+ADMIN_USERNAME = os.environ["ADMIN_USERNAME"]
 engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
 
 def initialiser_schema():
@@ -134,6 +135,25 @@ def token_requis(f):
             donnees = jwt.decode(auth[7:], SECRET_KEY, algorithms=["HS256"])
         except jwt.InvalidTokenError:
             return jsonify({"erreur": "Token invalide ou expire"}), 401
+        return f(donnees["user_id"], *args, **kwargs)
+    return wrapper
+
+def admin_requis(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        auth = request.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            return jsonify({"erreur": "Authentification requise"}), 401
+        try:
+            donnees = jwt.decode(auth[7:], SECRET_KEY, algorithms=["HS256"])
+        except jwt.InvalidTokenError:
+            return jsonify({"erreur": "Token invalide ou expire"}), 401
+        with engine.connect() as conn:
+            ligne = conn.execute(
+                text("SELECT username FROM users WHERE id = :id"), {"id": donnees["user_id"]}
+            ).fetchone()
+        if not ligne or ligne.username != ADMIN_USERNAME:
+            return jsonify({"erreur": "Acces reserve"}), 403
         return f(donnees["user_id"], *args, **kwargs)
     return wrapper
 
@@ -709,6 +729,44 @@ def check_reminders():
             conn.commit()
 
     return jsonify({"taches_verifiees": len(taches_a_notifier), "notifications_envoyees": notifiees})
+
+# ---------- admin (reserve a ADMIN_USERNAME) ----------
+
+TABLES_ADMIN = {
+    "users": ["id", "username", "email"],
+    "taches": ["id", "titre", "terminee", "user_id", "date_echeance", "recurrence", "terminee_le", "rappel_envoye"],
+    "sous_taches": ["id", "tache_id", "titre", "terminee"],
+    "push_subscriptions": ["id", "user_id", "endpoint"],
+}
+
+@app.route("/admin/tables", methods=["GET"])
+@admin_requis
+def admin_lister_tables(user_id):
+    with engine.connect() as conn:
+        infos = [
+            {"nom": nom, "total": conn.execute(text(f"SELECT COUNT(*) FROM {nom}")).scalar()}
+            for nom in TABLES_ADMIN
+        ]
+    return jsonify(infos)
+
+@app.route("/admin/tables/<nom_table>", methods=["GET"])
+@admin_requis
+def admin_lister_lignes(user_id, nom_table):
+    if nom_table not in TABLES_ADMIN:
+        return jsonify({"erreur": "table inconnue"}), 404
+
+    colonnes = TABLES_ADMIN[nom_table]
+    colonnes_sql = ", ".join(colonnes)
+    with engine.connect() as conn:
+        resultat = conn.execute(text(f"SELECT {colonnes_sql} FROM {nom_table} ORDER BY id DESC LIMIT 200"))
+        lignes = [dict(ligne._mapping) for ligne in resultat]
+
+    for ligne in lignes:
+        for cle, valeur in ligne.items():
+            if hasattr(valeur, "isoformat"):
+                ligne[cle] = valeur.isoformat()
+
+    return jsonify({"colonnes": colonnes, "lignes": lignes})
 
 if __name__ == "__main__":
     app.run(debug=True)

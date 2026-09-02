@@ -120,6 +120,18 @@ export function supprimerSousTache(token, id) {
   });
 }
 
+export function getAdminTables(token) {
+  return fetch(`${BASE_URL}/admin/tables`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function getAdminLignes(token, nomTable) {
+  return fetch(`${BASE_URL}/admin/tables/${nomTable}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export function getStats(token) {
   return fetch(`${BASE_URL}/stats`, {
     headers: { Authorization: `Bearer ${token}` },
