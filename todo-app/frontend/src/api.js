@@ -88,3 +88,14 @@ export function pushUnsubscribe(token, endpoint) {
     body: JSON.stringify({ endpoint }),
   });
 }
+
+export function envoyerMessageAssistant(token, message, historique) {
+  return fetch(`${BASE_URL}/assistant`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ message, historique }),
+  });
+}

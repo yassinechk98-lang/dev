@@ -28,6 +28,7 @@ FRONTEND_URL = os.environ["FRONTEND_URL"]
 VAPID_PRIVATE_KEY = os.environ["VAPID_PRIVATE_KEY"]
 VAPID_PUBLIC_KEY = os.environ["VAPID_PUBLIC_KEY"]
 CRON_SECRET = os.environ["CRON_SECRET"]
+GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
 
 def initialiser_schema():
@@ -298,6 +299,115 @@ def supprimer_tache(user_id, tache_id):
         return jsonify({"erreur": f"Aucune tache avec l'id {tache_id}"}), 404
 
     return "", 204
+
+# ---------- assistant ia ----------
+
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
+
+FONCTIONS_ASSISTANT = [
+    {
+        "name": "lister_taches",
+        "description": "Liste toutes les taches de l'utilisateur, avec leur id, titre, statut (terminee) et date d'echeance.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "creer_tache",
+        "description": "Cree une nouvelle tache pour l'utilisateur.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "titre": {"type": "string", "description": "Le titre de la tache"},
+                "date_echeance": {
+                    "type": "string",
+                    "description": "Date et heure d'echeance au format ISO 8601 (ex: 2026-09-03T14:00:00). Omettre si aucune echeance n'est demandee.",
+                },
+            },
+            "required": ["titre"],
+        },
+    },
+    {
+        "name": "basculer_tache",
+        "description": "Inverse le statut d'une tache (termine une tache en cours, ou reouvre une tache terminee). Appelle lister_taches avant si tu ne connais pas deja l'id.",
+        "parameters": {
+            "type": "object",
+            "properties": {"tache_id": {"type": "integer", "description": "L'id de la tache"}},
+            "required": ["tache_id"],
+        },
+    },
+    {
+        "name": "supprimer_tache",
+        "description": "Supprime definitivement une tache. Appelle lister_taches avant si tu ne connais pas deja l'id.",
+        "parameters": {
+            "type": "object",
+            "properties": {"tache_id": {"type": "integer", "description": "L'id de la tache"}},
+            "required": ["tache_id"],
+        },
+    },
+]
+
+def executer_fonction_assistant(user_id, nom, args):
+    if nom == "lister_taches":
+        return {"taches": lister_taches_db(user_id)}
+    if nom == "creer_tache":
+        tache = creer_tache_db(user_id, args["titre"], args.get("date_echeance") or None)
+        return {"tache": tache}
+    if nom == "basculer_tache":
+        tache = basculer_tache_db(user_id, args["tache_id"])
+        return {"tache": tache} if tache else {"erreur": "tache introuvable"}
+    if nom == "supprimer_tache":
+        return {"succes": supprimer_tache_db(user_id, args["tache_id"])}
+    return {"erreur": f"fonction inconnue : {nom}"}
+
+@app.route("/assistant", methods=["POST"])
+@token_requis
+def assistant(user_id):
+    data = request.get_json()
+    if not data or not data.get("message"):
+        return jsonify({"erreur": "message requis"}), 400
+
+    historique = data.get("historique") or []
+    historique.append({"role": "user", "parts": [{"text": data["message"]}]})
+
+    instruction_systeme = (
+        "Tu es un assistant qui aide l'utilisateur a gerer sa todo-list en francais. "
+        "Utilise les fonctions disponibles pour lister, creer, terminer/reouvrir ou supprimer des taches. "
+        f"La date et l'heure actuelles sont : {datetime.now().strftime('%Y-%m-%dT%H:%M:%S')} ({datetime.now().strftime('%A')}). "
+        "Quand l'utilisateur donne une date relative (demain, ce soir, lundi prochain...), calcule la date exacte. "
+        "Reponds toujours de maniere breve et naturelle en francais apres avoir effectue les actions necessaires."
+    )
+
+    for _ in range(5):
+        reponse = requests.post(
+            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            json={
+                "contents": historique,
+                "system_instruction": {"parts": [{"text": instruction_systeme}]},
+                "tools": [{"functionDeclarations": FONCTIONS_ASSISTANT}],
+            },
+            timeout=30,
+        )
+        reponse.raise_for_status()
+        candidat = reponse.json()["candidates"][0]
+        parts = candidat["content"]["parts"]
+        historique.append({"role": "model", "parts": parts})
+
+        appels = [p for p in parts if "functionCall" in p]
+        if not appels:
+            texte = "".join(p.get("text", "") for p in parts)
+            return jsonify({"reponse": texte, "historique": historique})
+
+        parts_reponse = []
+        for appel in appels:
+            fc = appel["functionCall"]
+            resultat_fonction = executer_fonction_assistant(user_id, fc["name"], fc.get("args", {}))
+            part_reponse = {"functionResponse": {"name": fc["name"], "response": resultat_fonction}}
+            if "id" in fc:
+                part_reponse["functionResponse"]["id"] = fc["id"]
+            parts_reponse.append(part_reponse)
+
+        historique.append({"role": "user", "parts": parts_reponse})
+
+    return jsonify({"erreur": "L'assistant n'a pas pu terminer la demande"}), 500
 
 # ---------- notifications push ----------
 

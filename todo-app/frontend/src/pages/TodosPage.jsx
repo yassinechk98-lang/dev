@@ -15,7 +15,9 @@ import ChecklistRtlIcon from '@mui/icons-material/ChecklistRtl';
 import AddIcon from '@mui/icons-material/Add';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { getTaches, creerTache, basculerTache, supprimerTache, getVapidPublicKey, pushSubscribe } from '../api';
+import AssistantChat from '../AssistantChat';
 
 function estEnRetard(tache) {
   if (!tache.date_echeance || tache.terminee) return false;
@@ -51,7 +53,15 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
   const [notification, setNotification] = useState(null);
   const [notifsActivees, setNotifsActivees] = useState(false);
   const [notifsSupportees, setNotifsSupportees] = useState(true);
+  const [assistantOuvert, setAssistantOuvert] = useState(false);
   const navigate = useNavigate();
+
+  const rafraichirTaches = () => {
+    getTaches(token)
+      .then((reponse) => reponse.json())
+      .then((donnees) => setTaches(donnees))
+      .catch(() => {});
+  };
 
   useEffect(() => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -150,6 +160,11 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
           <Typography variant="h6" sx={{ flexGrow: 1 }} fontWeight={700}>
             Ma Todo-list
           </Typography>
+          <Tooltip title="Assistant">
+            <IconButton color="inherit" onClick={() => setAssistantOuvert(true)}>
+              <SmartToyIcon />
+            </IconButton>
+          </Tooltip>
           {notifsSupportees && (
             <Tooltip title={notifsActivees ? "Rappels actives" : "Activer les rappels"}>
               <span>
@@ -299,6 +314,13 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
         onClose={() => setNotification(null)}
         message={notification}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+
+      <AssistantChat
+        token={token}
+        ouvert={assistantOuvert}
+        fermer={() => setAssistantOuvert(false)}
+        onTachesChangees={rafraichirTaches}
       />
     </Box>
   );
