@@ -16,8 +16,8 @@ séance dans `seances/`.
 - [x] Séance 31 — Qu'est-ce qu'une base relationnelle ? Premières requêtes SELECT
 - [x] Séance 32 — Modéliser les données : tables, types, contraintes
 - [x] Séance 33 — Manipuler les données en SQL pur (INSERT/UPDATE/DELETE/WHERE)
-- [ ] Séance 34 — Les relations entre tables : clés étrangères et JOIN
-- [ ] Séance 35 — Index, transactions, et pourquoi ça protège les données
+- [x] Séance 34 — Les relations entre tables : clés étrangères et JOIN
+- [x] Séance 35 — Index, transactions, et pourquoi ça protège les données
 - [ ] Séance 36 — L'architecture complète : du clic React à la ligne PostgreSQL et retour
 
 ## Pourquoi cet ordre

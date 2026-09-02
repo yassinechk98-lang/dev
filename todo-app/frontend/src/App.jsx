@@ -25,7 +25,6 @@ function Chargement() {
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [mode, setMode] = useState(() => localStorage.getItem("theme-mode") || "light");
-
   const basculerMode = () => {
     setMode((m) => {
       const nouveau = m === "light" ? "dark" : "light";
