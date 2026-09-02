@@ -138,6 +138,36 @@ export function getAdminLignes(token, nomTable) {
   });
 }
 
+export function creerPartage(token, username) {
+  return fetch(`${BASE_URL}/partages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ username }),
+  });
+}
+
+export function getPartages(token) {
+  return fetch(`${BASE_URL}/partages`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function supprimerPartage(token, id) {
+  return fetch(`${BASE_URL}/partages/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function getTachesPartagees(token, proprietaireId) {
+  return fetch(`${BASE_URL}/taches/partages/${proprietaireId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export function exporterTaches(token) {
   return fetch(`${BASE_URL}/export`, {
     headers: { Authorization: `Bearer ${token}` },

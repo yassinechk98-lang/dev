@@ -75,6 +75,14 @@ def initialiser_schema():
                 terminee BOOLEAN DEFAULT FALSE
             )
         """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS partages_liste (
+                id SERIAL PRIMARY KEY,
+                proprietaire_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                invite_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE (proprietaire_id, invite_id)
+            )
+        """))
         conn.commit()
 
 # Neon (base gratuite) peut mettre quelques secondes a "reveiller" la base au
@@ -470,6 +478,98 @@ def supprimer_sous_tache(user_id, sous_tache_id):
     if not supprime:
         return jsonify({"erreur": f"Aucune sous-tache avec l'id {sous_tache_id}"}), 404
     return "", 204
+
+# ---------- partage de liste (lecture seule) ----------
+
+def creer_partage_db(proprietaire_id, username_invite):
+    with engine.connect() as conn:
+        invite = conn.execute(
+            text("SELECT id FROM users WHERE username = :u"), {"u": username_invite}
+        ).fetchone()
+        if not invite:
+            return None, "Utilisateur introuvable"
+        if invite.id == proprietaire_id:
+            return None, "Impossible de partager avec toi-meme"
+        existe = conn.execute(
+            text("SELECT id FROM partages_liste WHERE proprietaire_id = :p AND invite_id = :i"),
+            {"p": proprietaire_id, "i": invite.id},
+        ).fetchone()
+        if existe:
+            return None, "Deja partage avec cet utilisateur"
+        conn.execute(
+            text("INSERT INTO partages_liste (proprietaire_id, invite_id) VALUES (:p, :i)"),
+            {"p": proprietaire_id, "i": invite.id},
+        )
+        conn.commit()
+        return {"username": username_invite}, None
+
+def lister_partages_db(user_id):
+    with engine.connect() as conn:
+        mes_partages = conn.execute(
+            text("""
+                SELECT pl.id, u.username FROM partages_liste pl
+                JOIN users u ON u.id = pl.invite_id
+                WHERE pl.proprietaire_id = :uid
+            """),
+            {"uid": user_id},
+        ).fetchall()
+        partages_avec_moi = conn.execute(
+            text("""
+                SELECT pl.id, u.id AS proprietaire_id, u.username FROM partages_liste pl
+                JOIN users u ON u.id = pl.proprietaire_id
+                WHERE pl.invite_id = :uid
+            """),
+            {"uid": user_id},
+        ).fetchall()
+    return {
+        "mes_partages": [dict(r._mapping) for r in mes_partages],
+        "partages_avec_moi": [dict(r._mapping) for r in partages_avec_moi],
+    }
+
+def supprimer_partage_db(user_id, partage_id):
+    with engine.connect() as conn:
+        resultat = conn.execute(
+            text("DELETE FROM partages_liste WHERE id = :id AND proprietaire_id = :uid"),
+            {"id": partage_id, "uid": user_id},
+        )
+        conn.commit()
+        return resultat.rowcount > 0
+
+@app.route("/partages", methods=["POST"])
+@token_requis
+def creer_partage(user_id):
+    data = request.get_json()
+    if not data or not data.get("username"):
+        return jsonify({"erreur": "username requis"}), 400
+
+    resultat, erreur = creer_partage_db(user_id, data["username"])
+    if erreur:
+        return jsonify({"erreur": erreur}), 404 if erreur == "Utilisateur introuvable" else 400
+    return jsonify(resultat), 201
+
+@app.route("/partages", methods=["GET"])
+@token_requis
+def lister_partages(user_id):
+    return jsonify(lister_partages_db(user_id))
+
+@app.route("/partages/<int:partage_id>", methods=["DELETE"])
+@token_requis
+def supprimer_partage(user_id, partage_id):
+    if not supprimer_partage_db(user_id, partage_id):
+        return jsonify({"erreur": "Partage introuvable"}), 404
+    return "", 204
+
+@app.route("/taches/partages/<int:proprietaire_id>", methods=["GET"])
+@token_requis
+def lister_taches_partagees(user_id, proprietaire_id):
+    with engine.connect() as conn:
+        autorise = conn.execute(
+            text("SELECT id FROM partages_liste WHERE proprietaire_id = :p AND invite_id = :i"),
+            {"p": proprietaire_id, "i": user_id},
+        ).fetchone()
+    if not autorise:
+        return jsonify({"erreur": "Acces non autorise"}), 403
+    return jsonify(lister_taches_db(proprietaire_id))
 
 # ---------- export / import ----------
 

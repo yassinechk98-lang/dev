@@ -9,6 +9,8 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const TodosPage = lazy(() => import('./pages/TodosPage'));
 const StatsPage = lazy(() => import('./pages/StatsPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
+const PartagesPage = lazy(() => import('./pages/PartagesPage'));
+const SharedListPage = lazy(() => import('./pages/SharedListPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 
@@ -65,6 +67,22 @@ function App() {
               element={
                 <RouteProtegee token={token}>
                   <AdminPage />
+                </RouteProtegee>
+              }
+            />
+            <Route
+              path="/partages"
+              element={
+                <RouteProtegee token={token}>
+                  <PartagesPage />
+                </RouteProtegee>
+              }
+            />
+            <Route
+              path="/partages/:proprietaireId"
+              element={
+                <RouteProtegee token={token}>
+                  <SharedListPage />
                 </RouteProtegee>
               }
             />

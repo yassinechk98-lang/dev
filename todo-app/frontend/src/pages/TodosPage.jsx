@@ -7,6 +7,7 @@ import {
   Menu, ListItemIcon, ListItemText,
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import GroupIcon from '@mui/icons-material/Group';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -251,6 +252,10 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
             </IconButton>
           </Tooltip>
           <Menu anchorEl={menuAncre} open={!!menuAncre} onClose={() => setMenuAncre(null)}>
+            <MenuItem onClick={() => { navigate('/partages'); setMenuAncre(null); }}>
+              <ListItemIcon><GroupIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Partage de liste</ListItemText>
+            </MenuItem>
             <MenuItem onClick={() => { navigate('/stats'); setMenuAncre(null); }}>
               <ListItemIcon><BarChartIcon fontSize="small" /></ListItemIcon>
               <ListItemText>Statistiques</ListItemText>
