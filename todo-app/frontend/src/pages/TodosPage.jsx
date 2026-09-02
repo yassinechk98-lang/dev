@@ -4,7 +4,9 @@ import {
   Box, Container, AppBar, Toolbar, Typography, IconButton, Tooltip,
   TextField, Button, Stack, Card, CardContent, Checkbox, Chip,
   Tabs, Tab, Skeleton, Alert, Snackbar, Fade, Select, MenuItem, FormControl, InputLabel,
+  Menu, ListItemIcon, ListItemText,
 } from '@mui/material';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -13,11 +15,14 @@ import EventIcon from '@mui/icons-material/Event';
 import ChecklistRtlIcon from '@mui/icons-material/ChecklistRtl';
 import RepeatIcon from '@mui/icons-material/Repeat';
 import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import BarChartIcon from '@mui/icons-material/BarChart';
-import { getTaches, creerTache, basculerTache, supprimerTache, getVapidPublicKey, pushSubscribe } from '../api';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
+import { getTaches, creerTache, basculerTache, supprimerTache, getVapidPublicKey, pushSubscribe, exporterTaches, importerTaches } from '../api';
 import AssistantChat from '../AssistantChat';
 import SousTaches from '../SousTaches';
 
@@ -25,6 +30,8 @@ function estEnRetard(tache) {
   if (!tache.date_echeance || tache.terminee) return false;
   return new Date(tache.date_echeance) < new Date();
 }
+
+const COULEUR_PRIORITE = { haute: "error", moyenne: "warning", basse: "default" };
 
 function formaterDate(dateIso) {
   const date = new Date(dateIso);
@@ -49,15 +56,20 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
   const [nouveauTitre, setNouveauTitre] = useState("");
   const [nouvelleDate, setNouvelleDate] = useState("");
   const [nouvelleRecurrence, setNouvelleRecurrence] = useState("");
+  const [nouvellePriorite, setNouvellePriorite] = useState("");
+  const [nouveauxTags, setNouveauxTags] = useState("");
   const [erreur, setErreur] = useState(null);
   const [chargement, setChargement] = useState(true);
   const [filtre, setFiltre] = useState("toutes");
+  const [recherche, setRecherche] = useState("");
   const [aRestaurer, setARestaurer] = useState(null);
   const suppressionTimeoutRef = useRef(null);
+  const fichierImportRef = useRef(null);
   const [notification, setNotification] = useState(null);
   const [notifsActivees, setNotifsActivees] = useState(false);
   const [notifsSupportees, setNotifsSupportees] = useState(true);
   const [assistantOuvert, setAssistantOuvert] = useState(false);
+  const [menuAncre, setMenuAncre] = useState(null);
   const navigate = useNavigate();
 
   const rafraichirTaches = () => {
@@ -112,6 +124,42 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
       .finally(() => setChargement(false));
   }, [token]);
 
+  const exporter = () => {
+    exporterTaches(token)
+      .then((reponse) => reponse.json())
+      .then((donnees) => {
+        const blob = new Blob([JSON.stringify(donnees, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const lien = document.createElement('a');
+        lien.href = url;
+        lien.download = 'taches.json';
+        lien.click();
+        URL.revokeObjectURL(url);
+      });
+  };
+
+  const importerFichier = (e) => {
+    const fichier = e.target.files[0];
+    e.target.value = '';
+    if (!fichier) return;
+
+    fichier.text().then((texte) => {
+      let items;
+      try {
+        items = JSON.parse(texte);
+      } catch {
+        setNotification("Fichier JSON invalide");
+        return;
+      }
+      importerTaches(token, items)
+        .then((reponse) => reponse.json())
+        .then((resultat) => {
+          setNotification(`${resultat.taches_importees} tache(s) importee(s)`);
+          rafraichirTaches();
+        });
+    });
+  };
+
   const deconnexion = () => {
     localStorage.removeItem("token");
     setToken(null);
@@ -121,13 +169,17 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
   const ajouterTache = () => {
     if (!nouveauTitre.trim()) return;
 
-    creerTache(token, nouveauTitre, nouvelleDate, nouvelleRecurrence)
+    const tags = nouveauxTags.split(",").map((t) => t.trim()).filter(Boolean);
+
+    creerTache(token, nouveauTitre, nouvelleDate, nouvelleRecurrence, nouvellePriorite, tags)
       .then((reponse) => reponse.json())
       .then((tache) => {
         setTaches([...taches, tache]);
         setNouveauTitre("");
         setNouvelleDate("");
         setNouvelleRecurrence("");
+        setNouvellePriorite("");
+        setNouveauxTags("");
         setNotification("Tache ajoutee");
       });
   };
@@ -164,10 +216,17 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
   };
 
   const tachesFiltrees = useMemo(() => {
-    if (filtre === "actives") return taches.filter((t) => !t.terminee);
-    if (filtre === "terminees") return taches.filter((t) => t.terminee);
-    return taches;
-  }, [taches, filtre]);
+    let resultat = taches;
+    if (filtre === "actives") resultat = resultat.filter((t) => !t.terminee);
+    if (filtre === "terminees") resultat = resultat.filter((t) => t.terminee);
+    if (recherche.trim()) {
+      const q = recherche.trim().toLowerCase();
+      resultat = resultat.filter(
+        (t) => t.titre.toLowerCase().includes(q) || (t.tags || []).some((tag) => tag.toLowerCase().includes(q))
+      );
+    }
+    return resultat;
+  }, [taches, filtre, recherche]);
 
   const nbActives = taches.filter((t) => !t.terminee).length;
 
@@ -179,11 +238,32 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
           <Typography variant="h6" sx={{ flexGrow: 1 }} fontWeight={700}>
             Ma Todo-list
           </Typography>
-          <Tooltip title="Statistiques">
-            <IconButton color="inherit" onClick={() => navigate('/stats')}>
-              <BarChartIcon />
+          <input
+            type="file"
+            accept=".json"
+            ref={fichierImportRef}
+            onChange={importerFichier}
+            style={{ display: 'none' }}
+          />
+          <Tooltip title="Plus d'options">
+            <IconButton color="inherit" onClick={(e) => setMenuAncre(e.currentTarget)}>
+              <MoreVertIcon />
             </IconButton>
           </Tooltip>
+          <Menu anchorEl={menuAncre} open={!!menuAncre} onClose={() => setMenuAncre(null)}>
+            <MenuItem onClick={() => { navigate('/stats'); setMenuAncre(null); }}>
+              <ListItemIcon><BarChartIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Statistiques</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { exporter(); setMenuAncre(null); }}>
+              <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Exporter</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { fichierImportRef.current.click(); setMenuAncre(null); }}>
+              <ListItemIcon><FileUploadIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Importer</ListItemText>
+            </MenuItem>
+          </Menu>
           <Tooltip title="Assistant">
             <IconButton color="inherit" onClick={() => setAssistantOuvert(true)}>
               <SmartToyIcon />
@@ -246,6 +326,26 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
                   <MenuItem value="hebdomadaire">Hebdomadaire</MenuItem>
                 </Select>
               </FormControl>
+              <FormControl size="small" sx={{ minWidth: { sm: 130 } }}>
+                <InputLabel>Priorite</InputLabel>
+                <Select
+                  label="Priorite"
+                  value={nouvellePriorite}
+                  onChange={(e) => setNouvellePriorite(e.target.value)}
+                >
+                  <MenuItem value="">Aucune</MenuItem>
+                  <MenuItem value="haute">Haute</MenuItem>
+                  <MenuItem value="moyenne">Moyenne</MenuItem>
+                  <MenuItem value="basse">Basse</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                label="Tags (separes par des virgules)"
+                value={nouveauxTags}
+                onChange={(e) => setNouveauxTags(e.target.value)}
+                size="small"
+                fullWidth
+              />
               <Button
                 variant="contained"
                 onClick={ajouterTache}
@@ -258,6 +358,18 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
             </Stack>
           </CardContent>
         </Card>
+
+        {!chargement && taches.length > 0 && (
+          <TextField
+            placeholder="Rechercher une tache..."
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            size="small"
+            fullWidth
+            sx={{ mb: 2 }}
+            slotProps={{ input: { startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.disabled' }} /> } }}
+          />
+        )}
 
         {!chargement && taches.length > 0 && (
           <Tabs
@@ -321,6 +433,23 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
                               variant="outlined"
                             />
                           )}
+                          {tache.priorite && (
+                            <Chip
+                              label={tache.priorite}
+                              size="small"
+                              color={COULEUR_PRIORITE[tache.priorite]}
+                              variant="filled"
+                            />
+                          )}
+                          {(tache.tags || []).map((tag) => (
+                            <Chip
+                              key={tag}
+                              label={tag}
+                              size="small"
+                              variant="outlined"
+                              onClick={() => setRecherche(tag)}
+                            />
+                          ))}
                         </Stack>
                       </Box>
                       <IconButton color="error" onClick={() => supprimerAvecUndo(tache)}>

@@ -55,6 +55,8 @@ def initialiser_schema():
         conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS rappel_envoye BOOLEAN DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS recurrence TEXT"))
         conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS terminee_le TIMESTAMP"))
+        conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS priorite TEXT"))
+        conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}'"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_taches_user_id ON taches (user_id)"))
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -255,20 +257,23 @@ def formater_tache(ligne):
 def lister_taches_db(user_id):
     with engine.connect() as conn:
         resultat = conn.execute(
-            text("SELECT id, titre, terminee, date_echeance, recurrence FROM taches WHERE user_id = :uid ORDER BY id"),
+            text("SELECT id, titre, terminee, date_echeance, recurrence, priorite, tags FROM taches WHERE user_id = :uid ORDER BY id"),
             {"uid": user_id},
         )
         return [formater_tache(ligne) for ligne in resultat]
 
-def creer_tache_db(user_id, titre, date_echeance, recurrence=None):
+def creer_tache_db(user_id, titre, date_echeance, recurrence=None, priorite=None, tags=None):
     with engine.connect() as conn:
         resultat = conn.execute(
             text("""
-                INSERT INTO taches (titre, terminee, user_id, date_echeance, recurrence)
-                VALUES (:titre, FALSE, :uid, :date_echeance, :recurrence)
-                RETURNING id, titre, terminee, date_echeance, recurrence
+                INSERT INTO taches (titre, terminee, user_id, date_echeance, recurrence, priorite, tags)
+                VALUES (:titre, FALSE, :uid, :date_echeance, :recurrence, :priorite, :tags)
+                RETURNING id, titre, terminee, date_echeance, recurrence, priorite, tags
             """),
-            {"titre": titre, "uid": user_id, "date_echeance": date_echeance, "recurrence": recurrence},
+            {
+                "titre": titre, "uid": user_id, "date_echeance": date_echeance,
+                "recurrence": recurrence, "priorite": priorite, "tags": tags or [],
+            },
         )
         conn.commit()
         return formater_tache(resultat.fetchone())
@@ -287,7 +292,7 @@ def basculer_tache_db(user_id, tache_id):
                     terminee = NOT terminee,
                     terminee_le = CASE WHEN NOT terminee THEN NOW() ELSE NULL END
                 WHERE id = :id AND user_id = :uid
-                RETURNING id, titre, terminee, date_echeance, recurrence
+                RETURNING id, titre, terminee, date_echeance, recurrence, priorite, tags
             """),
             {"id": tache_id, "uid": user_id},
         )
@@ -300,14 +305,16 @@ def basculer_tache_db(user_id, tache_id):
         if tache["terminee"] and tache["recurrence"]:
             conn.execute(
                 text("""
-                    INSERT INTO taches (titre, terminee, user_id, date_echeance, recurrence)
-                    VALUES (:titre, FALSE, :uid, :date_echeance, :recurrence)
+                    INSERT INTO taches (titre, terminee, user_id, date_echeance, recurrence, priorite, tags)
+                    VALUES (:titre, FALSE, :uid, :date_echeance, :recurrence, :priorite, :tags)
                 """),
                 {
                     "titre": tache["titre"],
                     "uid": user_id,
                     "date_echeance": _prochaine_echeance(ligne.date_echeance, tache["recurrence"]),
                     "recurrence": tache["recurrence"],
+                    "priorite": tache["priorite"],
+                    "tags": tache["tags"],
                 },
             )
         conn.commit()
@@ -339,7 +346,17 @@ def creer_tache(user_id):
     if recurrence not in (None, "quotidien", "hebdomadaire"):
         return jsonify({"erreur": "recurrence doit etre 'quotidien', 'hebdomadaire' ou absente"}), 400
 
-    nouvelle_tache = creer_tache_db(user_id, data["titre"], data.get("date_echeance") or None, recurrence)
+    priorite = data.get("priorite") or None
+    if priorite not in (None, "haute", "moyenne", "basse"):
+        return jsonify({"erreur": "priorite doit etre 'haute', 'moyenne', 'basse' ou absente"}), 400
+
+    tags = data.get("tags") or []
+    if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
+        return jsonify({"erreur": "tags doit etre une liste de chaines"}), 400
+
+    nouvelle_tache = creer_tache_db(
+        user_id, data["titre"], data.get("date_echeance") or None, recurrence, priorite, tags
+    )
     return jsonify(nouvelle_tache), 201
 
 @app.route("/taches/<int:tache_id>", methods=["PUT"])
@@ -454,6 +471,82 @@ def supprimer_sous_tache(user_id, sous_tache_id):
         return jsonify({"erreur": f"Aucune sous-tache avec l'id {sous_tache_id}"}), 404
     return "", 204
 
+# ---------- export / import ----------
+
+def exporter_taches_db(user_id):
+    with engine.connect() as conn:
+        taches = conn.execute(
+            text("SELECT id, titre, terminee, date_echeance, recurrence, priorite, tags FROM taches WHERE user_id = :uid ORDER BY id"),
+            {"uid": user_id},
+        ).fetchall()
+
+        resultat = []
+        for t in taches:
+            sous_taches = conn.execute(
+                text("SELECT titre, terminee FROM sous_taches WHERE tache_id = :tid ORDER BY id"),
+                {"tid": t.id},
+            ).fetchall()
+            resultat.append({
+                "titre": t.titre,
+                "terminee": t.terminee,
+                "date_echeance": t.date_echeance.isoformat() if t.date_echeance else None,
+                "recurrence": t.recurrence,
+                "priorite": t.priorite,
+                "tags": t.tags,
+                "sous_taches": [{"titre": s.titre, "terminee": s.terminee} for s in sous_taches],
+            })
+        return resultat
+
+def importer_taches_db(user_id, items):
+    compteur = 0
+    with engine.connect() as conn:
+        for item in items:
+            if not isinstance(item, dict) or not item.get("titre"):
+                continue
+            resultat = conn.execute(
+                text("""
+                    INSERT INTO taches (titre, terminee, user_id, date_echeance, recurrence, priorite, tags)
+                    VALUES (:titre, :terminee, :uid, :date_echeance, :recurrence, :priorite, :tags)
+                    RETURNING id
+                """),
+                {
+                    "titre": str(item["titre"]),
+                    "terminee": bool(item.get("terminee", False)),
+                    "uid": user_id,
+                    "date_echeance": item.get("date_echeance"),
+                    "recurrence": item.get("recurrence") if item.get("recurrence") in ("quotidien", "hebdomadaire") else None,
+                    "priorite": item.get("priorite") if item.get("priorite") in ("haute", "moyenne", "basse") else None,
+                    "tags": item.get("tags") if isinstance(item.get("tags"), list) else [],
+                },
+            )
+            tache_id = resultat.fetchone()[0]
+            for sous in item.get("sous_taches") or []:
+                if isinstance(sous, dict) and sous.get("titre"):
+                    conn.execute(
+                        text("INSERT INTO sous_taches (tache_id, titre, terminee) VALUES (:tid, :titre, :terminee)"),
+                        {"tid": tache_id, "titre": str(sous["titre"]), "terminee": bool(sous.get("terminee", False))},
+                    )
+            compteur += 1
+        conn.commit()
+    return compteur
+
+@app.route("/export", methods=["GET"])
+@token_requis
+def export_taches(user_id):
+    return jsonify(exporter_taches_db(user_id))
+
+@app.route("/import", methods=["POST"])
+@token_requis
+def import_taches(user_id):
+    data = request.get_json()
+    if not isinstance(data, list):
+        return jsonify({"erreur": "Le corps doit etre une liste de taches"}), 400
+    if len(data) > 500:
+        return jsonify({"erreur": "Trop de taches (500 maximum par import)"}), 400
+
+    total = importer_taches_db(user_id, data)
+    return jsonify({"taches_importees": total}), 201
+
 # ---------- statistiques ----------
 
 def obtenir_stats_db(user_id):
@@ -533,6 +626,16 @@ FONCTIONS_ASSISTANT = [
                     "enum": ["quotidien", "hebdomadaire"],
                     "description": "Si la tache doit se repeter automatiquement chaque jour ou chaque semaine. Omettre si la tache ne se repete pas.",
                 },
+                "priorite": {
+                    "type": "string",
+                    "enum": ["haute", "moyenne", "basse"],
+                    "description": "Niveau de priorite de la tache. Omettre si non precise.",
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Liste de mots-cles/categories pour la tache (ex: ['travail', 'urgent']). Omettre si non precise.",
+                },
             },
             "required": ["titre"],
         },
@@ -562,7 +665,8 @@ def executer_fonction_assistant(user_id, nom, args):
         return {"taches": lister_taches_db(user_id)}
     if nom == "creer_tache":
         tache = creer_tache_db(
-            user_id, args["titre"], args.get("date_echeance") or None, args.get("recurrence") or None
+            user_id, args["titre"], args.get("date_echeance") or None, args.get("recurrence") or None,
+            args.get("priorite") or None, args.get("tags") or [],
         )
         return {"tache": tache}
     if nom == "basculer_tache":
@@ -734,7 +838,7 @@ def check_reminders():
 
 TABLES_ADMIN = {
     "users": ["id", "username", "email"],
-    "taches": ["id", "titre", "terminee", "user_id", "date_echeance", "recurrence", "terminee_le", "rappel_envoye"],
+    "taches": ["id", "titre", "terminee", "user_id", "date_echeance", "recurrence", "priorite", "tags", "terminee_le", "rappel_envoye"],
     "sous_taches": ["id", "tache_id", "titre", "terminee"],
     "push_subscriptions": ["id", "user_id", "endpoint"],
 }

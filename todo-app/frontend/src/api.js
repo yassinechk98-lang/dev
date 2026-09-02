@@ -38,14 +38,20 @@ export function getTaches(token) {
   });
 }
 
-export function creerTache(token, titre, dateEcheance, recurrence) {
+export function creerTache(token, titre, dateEcheance, recurrence, priorite, tags) {
   return fetch(`${BASE_URL}/taches`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ titre, date_echeance: dateEcheance, recurrence: recurrence || null }),
+    body: JSON.stringify({
+      titre,
+      date_echeance: dateEcheance,
+      recurrence: recurrence || null,
+      priorite: priorite || null,
+      tags: tags || [],
+    }),
   });
 }
 
@@ -129,6 +135,23 @@ export function getAdminTables(token) {
 export function getAdminLignes(token, nomTable) {
   return fetch(`${BASE_URL}/admin/tables/${nomTable}`, {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function exporterTaches(token) {
+  return fetch(`${BASE_URL}/export`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function importerTaches(token, items) {
+  return fetch(`${BASE_URL}/import`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(items),
   });
 }
 
