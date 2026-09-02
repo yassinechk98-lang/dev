@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chat - Hello World WebSocket</title>
+</head>
+<body>
+  <h1>Test WebSocket</h1>
+  <button onclick="envoyerPing()">Envoyer un ping</button>
+  <p id="reponse">En attente...</p>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    const socket = io();
+
+    function envoyerPing() {
+      socket.emit("ping_client", { texte: "salut serveur" });
+    }
+
+    socket.on("pong_serveur", (data) => {
+      document.getElementById("reponse").innerText = data.message;
+    });
+
+    socket.on("connect", () => {
+      console.log("Connecte au serveur via WebSocket, id:", socket.id);
+    });
+  </script>
+</body>
+</html>
