@@ -1,10 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Container, AppBar, Toolbar, Typography, IconButton, Tooltip,
   TextField, Button, Stack, Card, CardContent, Checkbox, Chip,
-  Tabs, Tab, Skeleton, Alert, Snackbar, Dialog, DialogTitle,
-  DialogContent, DialogContentText, DialogActions, Fade,
+  Tabs, Tab, Skeleton, Alert, Snackbar, Fade, Select, MenuItem, FormControl, InputLabel,
 } from '@mui/material';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
@@ -12,12 +11,15 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import EventIcon from '@mui/icons-material/Event';
 import ChecklistRtlIcon from '@mui/icons-material/ChecklistRtl';
+import RepeatIcon from '@mui/icons-material/Repeat';
 import AddIcon from '@mui/icons-material/Add';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import { getTaches, creerTache, basculerTache, supprimerTache, getVapidPublicKey, pushSubscribe } from '../api';
 import AssistantChat from '../AssistantChat';
+import SousTaches from '../SousTaches';
 
 function estEnRetard(tache) {
   if (!tache.date_echeance || tache.terminee) return false;
@@ -46,10 +48,12 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
   const [taches, setTaches] = useState([]);
   const [nouveauTitre, setNouveauTitre] = useState("");
   const [nouvelleDate, setNouvelleDate] = useState("");
+  const [nouvelleRecurrence, setNouvelleRecurrence] = useState("");
   const [erreur, setErreur] = useState(null);
   const [chargement, setChargement] = useState(true);
   const [filtre, setFiltre] = useState("toutes");
-  const [aSupprimer, setASupprimer] = useState(null);
+  const [aRestaurer, setARestaurer] = useState(null);
+  const suppressionTimeoutRef = useRef(null);
   const [notification, setNotification] = useState(null);
   const [notifsActivees, setNotifsActivees] = useState(false);
   const [notifsSupportees, setNotifsSupportees] = useState(true);
@@ -117,12 +121,13 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
   const ajouterTache = () => {
     if (!nouveauTitre.trim()) return;
 
-    creerTache(token, nouveauTitre, nouvelleDate)
+    creerTache(token, nouveauTitre, nouvelleDate, nouvelleRecurrence)
       .then((reponse) => reponse.json())
       .then((tache) => {
         setTaches([...taches, tache]);
         setNouveauTitre("");
         setNouvelleDate("");
+        setNouvelleRecurrence("");
         setNotification("Tache ajoutee");
       });
   };
@@ -131,17 +136,31 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
     basculerTache(token, id)
       .then((reponse) => reponse.json())
       .then((tacheMaj) => {
-        setTaches(taches.map((t) => (t.id === id ? tacheMaj : t)));
+        if (tacheMaj.recurrence) {
+          rafraichirTaches();
+        } else {
+          setTaches((prev) => prev.map((t) => (t.id === id ? tacheMaj : t)));
+        }
       });
   };
 
-  const confirmerSuppression = () => {
-    const id = aSupprimer;
-    setASupprimer(null);
-    supprimerTache(token, id).then(() => {
-      setTaches(taches.filter((t) => t.id !== id));
-      setNotification("Tache supprimee");
-    });
+  useEffect(() => {
+    return () => clearTimeout(suppressionTimeoutRef.current);
+  }, []);
+
+  const supprimerAvecUndo = (tache) => {
+    setTaches((prev) => prev.filter((t) => t.id !== tache.id));
+    setARestaurer(tache);
+    suppressionTimeoutRef.current = setTimeout(() => {
+      supprimerTache(token, tache.id);
+      setARestaurer(null);
+    }, 5000);
+  };
+
+  const annulerSuppression = () => {
+    clearTimeout(suppressionTimeoutRef.current);
+    setTaches((prev) => [...prev, aRestaurer].sort((a, b) => a.id - b.id));
+    setARestaurer(null);
   };
 
   const tachesFiltrees = useMemo(() => {
@@ -160,6 +179,11 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
           <Typography variant="h6" sx={{ flexGrow: 1 }} fontWeight={700}>
             Ma Todo-list
           </Typography>
+          <Tooltip title="Statistiques">
+            <IconButton color="inherit" onClick={() => navigate('/stats')}>
+              <BarChartIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Assistant">
             <IconButton color="inherit" onClick={() => setAssistantOuvert(true)}>
               <SmartToyIcon />
@@ -210,6 +234,18 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
                 size="small"
                 sx={{ minWidth: { sm: 210 } }}
               />
+              <FormControl size="small" sx={{ minWidth: { sm: 150 } }}>
+                <InputLabel>Repetition</InputLabel>
+                <Select
+                  label="Repetition"
+                  value={nouvelleRecurrence}
+                  onChange={(e) => setNouvelleRecurrence(e.target.value)}
+                >
+                  <MenuItem value="">Aucune</MenuItem>
+                  <MenuItem value="quotidien">Quotidienne</MenuItem>
+                  <MenuItem value="hebdomadaire">Hebdomadaire</MenuItem>
+                </Select>
+              </FormControl>
               <Button
                 variant="contained"
                 onClick={ajouterTache}
@@ -254,39 +290,46 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
             {tachesFiltrees.map((tache) => (
               <Fade in key={tache.id}>
                 <Card elevation={0} sx={{ border: 1, borderColor: 'divider' }}>
-                  <CardContent
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                      '&:last-child': { pb: 2 },
-                    }}
-                  >
-                    <Checkbox checked={tache.terminee} onChange={() => basculer(tache.id)} />
-                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                      <Typography
-                        sx={{
-                          textDecoration: tache.terminee ? 'line-through' : 'none',
-                          color: tache.terminee ? 'text.secondary' : 'text.primary',
-                          wordBreak: 'break-word',
-                        }}
-                      >
-                        {tache.titre}
-                      </Typography>
-                      {tache.date_echeance && (
-                        <Chip
-                          icon={<EventIcon />}
-                          label={formaterDate(tache.date_echeance)}
-                          size="small"
-                          color={estEnRetard(tache) ? "error" : "default"}
-                          variant={estEnRetard(tache) ? "filled" : "outlined"}
-                          sx={{ mt: 0.5 }}
-                        />
-                      )}
+                  <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Checkbox checked={tache.terminee} onChange={() => basculer(tache.id)} />
+                      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                        <Typography
+                          sx={{
+                            textDecoration: tache.terminee ? 'line-through' : 'none',
+                            color: tache.terminee ? 'text.secondary' : 'text.primary',
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {tache.titre}
+                        </Typography>
+                        <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: 'wrap' }}>
+                          {tache.date_echeance && (
+                            <Chip
+                              icon={<EventIcon />}
+                              label={formaterDate(tache.date_echeance)}
+                              size="small"
+                              color={estEnRetard(tache) ? "error" : "default"}
+                              variant={estEnRetard(tache) ? "filled" : "outlined"}
+                            />
+                          )}
+                          {tache.recurrence && (
+                            <Chip
+                              icon={<RepeatIcon />}
+                              label={tache.recurrence === "hebdomadaire" ? "Chaque semaine" : "Chaque jour"}
+                              size="small"
+                              variant="outlined"
+                            />
+                          )}
+                        </Stack>
+                      </Box>
+                      <IconButton color="error" onClick={() => supprimerAvecUndo(tache)}>
+                        <DeleteOutlineIcon />
+                      </IconButton>
                     </Box>
-                    <IconButton color="error" onClick={() => setASupprimer(tache.id)}>
-                      <DeleteOutlineIcon />
-                    </IconButton>
+                    <Box sx={{ pl: 6 }}>
+                      <SousTaches token={token} tacheId={tache.id} />
+                    </Box>
                   </CardContent>
                 </Card>
               </Fade>
@@ -295,18 +338,18 @@ function TodosPage({ token, setToken, mode, basculerMode }) {
         )}
       </Container>
 
-      <Dialog open={aSupprimer !== null} onClose={() => setASupprimer(null)}>
-        <DialogTitle>Supprimer cette tache ?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Cette action est definitive.</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setASupprimer(null)}>Annuler</Button>
-          <Button onClick={confirmerSuppression} color="error" variant="contained">
-            Supprimer
+      <Snackbar
+        open={!!aRestaurer}
+        autoHideDuration={5000}
+        onClose={(e, raison) => raison !== 'clickaway' && setARestaurer(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        message="Tache supprimee"
+        action={
+          <Button color="inherit" size="small" onClick={annulerSuppression}>
+            ANNULER
           </Button>
-        </DialogActions>
-      </Dialog>
+        }
+      />
 
       <Snackbar
         open={!!notification}

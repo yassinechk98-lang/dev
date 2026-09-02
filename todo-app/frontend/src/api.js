@@ -38,14 +38,14 @@ export function getTaches(token) {
   });
 }
 
-export function creerTache(token, titre, dateEcheance) {
+export function creerTache(token, titre, dateEcheance, recurrence) {
   return fetch(`${BASE_URL}/taches`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ titre, date_echeance: dateEcheance }),
+    body: JSON.stringify({ titre, date_echeance: dateEcheance, recurrence: recurrence || null }),
   });
 }
 
@@ -86,6 +86,43 @@ export function pushUnsubscribe(token, endpoint) {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ endpoint }),
+  });
+}
+
+export function getSousTaches(token, tacheId) {
+  return fetch(`${BASE_URL}/taches/${tacheId}/sous-taches`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function creerSousTache(token, tacheId, titre) {
+  return fetch(`${BASE_URL}/taches/${tacheId}/sous-taches`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ titre }),
+  });
+}
+
+export function basculerSousTache(token, id) {
+  return fetch(`${BASE_URL}/sous-taches/${id}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function supprimerSousTache(token, id) {
+  return fetch(`${BASE_URL}/sous-taches/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export function getStats(token) {
+  return fetch(`${BASE_URL}/stats`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
 }
 

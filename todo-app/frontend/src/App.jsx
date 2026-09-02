@@ -7,6 +7,7 @@ import { creerTheme } from './theme';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const TodosPage = lazy(() => import('./pages/TodosPage'));
+const StatsPage = lazy(() => import('./pages/StatsPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 
@@ -47,6 +48,14 @@ function App() {
               element={
                 <RouteProtegee token={token}>
                   <TodosPage token={token} setToken={setToken} mode={mode} basculerMode={basculerMode} />
+                </RouteProtegee>
+              }
+            />
+            <Route
+              path="/stats"
+              element={
+                <RouteProtegee token={token}>
+                  <StatsPage />
                 </RouteProtegee>
               }
             />

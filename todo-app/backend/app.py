@@ -52,6 +52,8 @@ def initialiser_schema():
         conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS date_echeance TIMESTAMP"))
         conn.execute(text("ALTER TABLE taches ALTER COLUMN date_echeance TYPE TIMESTAMP"))
         conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS rappel_envoye BOOLEAN DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS recurrence TEXT"))
+        conn.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS terminee_le TIMESTAMP"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_taches_user_id ON taches (user_id)"))
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -60,6 +62,14 @@ def initialiser_schema():
                 endpoint TEXT UNIQUE NOT NULL,
                 p256dh TEXT NOT NULL,
                 auth TEXT NOT NULL
+            )
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS sous_taches (
+                id SERIAL PRIMARY KEY,
+                tache_id INTEGER NOT NULL REFERENCES taches(id) ON DELETE CASCADE,
+                titre TEXT NOT NULL,
+                terminee BOOLEAN DEFAULT FALSE
             )
         """))
         conn.commit()
@@ -225,37 +235,63 @@ def formater_tache(ligne):
 def lister_taches_db(user_id):
     with engine.connect() as conn:
         resultat = conn.execute(
-            text("SELECT id, titre, terminee, date_echeance FROM taches WHERE user_id = :uid ORDER BY id"),
+            text("SELECT id, titre, terminee, date_echeance, recurrence FROM taches WHERE user_id = :uid ORDER BY id"),
             {"uid": user_id},
         )
         return [formater_tache(ligne) for ligne in resultat]
 
-def creer_tache_db(user_id, titre, date_echeance):
+def creer_tache_db(user_id, titre, date_echeance, recurrence=None):
     with engine.connect() as conn:
         resultat = conn.execute(
             text("""
-                INSERT INTO taches (titre, terminee, user_id, date_echeance)
-                VALUES (:titre, FALSE, :uid, :date_echeance)
-                RETURNING id, titre, terminee, date_echeance
+                INSERT INTO taches (titre, terminee, user_id, date_echeance, recurrence)
+                VALUES (:titre, FALSE, :uid, :date_echeance, :recurrence)
+                RETURNING id, titre, terminee, date_echeance, recurrence
             """),
-            {"titre": titre, "uid": user_id, "date_echeance": date_echeance},
+            {"titre": titre, "uid": user_id, "date_echeance": date_echeance, "recurrence": recurrence},
         )
         conn.commit()
         return formater_tache(resultat.fetchone())
+
+def _prochaine_echeance(date_echeance, recurrence):
+    if date_echeance is None:
+        return None
+    jours = 7 if recurrence == "hebdomadaire" else 1
+    return date_echeance + timedelta(days=jours)
 
 def basculer_tache_db(user_id, tache_id):
     with engine.connect() as conn:
         resultat = conn.execute(
             text("""
-                UPDATE taches SET terminee = NOT terminee
+                UPDATE taches SET
+                    terminee = NOT terminee,
+                    terminee_le = CASE WHEN NOT terminee THEN NOW() ELSE NULL END
                 WHERE id = :id AND user_id = :uid
-                RETURNING id, titre, terminee, date_echeance
+                RETURNING id, titre, terminee, date_echeance, recurrence
             """),
             {"id": tache_id, "uid": user_id},
         )
-        conn.commit()
         ligne = resultat.fetchone()
-        return formater_tache(ligne) if ligne else None
+        if ligne is None:
+            conn.commit()
+            return None
+
+        tache = formater_tache(ligne)
+        if tache["terminee"] and tache["recurrence"]:
+            conn.execute(
+                text("""
+                    INSERT INTO taches (titre, terminee, user_id, date_echeance, recurrence)
+                    VALUES (:titre, FALSE, :uid, :date_echeance, :recurrence)
+                """),
+                {
+                    "titre": tache["titre"],
+                    "uid": user_id,
+                    "date_echeance": _prochaine_echeance(ligne.date_echeance, tache["recurrence"]),
+                    "recurrence": tache["recurrence"],
+                },
+            )
+        conn.commit()
+        return tache
 
 def supprimer_tache_db(user_id, tache_id):
     with engine.connect() as conn:
@@ -279,7 +315,11 @@ def creer_tache(user_id):
     if not data or "titre" not in data or not data["titre"].strip():
         return jsonify({"erreur": "Le champ 'titre' est requis"}), 400
 
-    nouvelle_tache = creer_tache_db(user_id, data["titre"], data.get("date_echeance") or None)
+    recurrence = data.get("recurrence") or None
+    if recurrence not in (None, "quotidien", "hebdomadaire"):
+        return jsonify({"erreur": "recurrence doit etre 'quotidien', 'hebdomadaire' ou absente"}), 400
+
+    nouvelle_tache = creer_tache_db(user_id, data["titre"], data.get("date_echeance") or None, recurrence)
     return jsonify(nouvelle_tache), 201
 
 @app.route("/taches/<int:tache_id>", methods=["PUT"])
@@ -299,6 +339,153 @@ def supprimer_tache(user_id, tache_id):
         return jsonify({"erreur": f"Aucune tache avec l'id {tache_id}"}), 404
 
     return "", 204
+
+# ---------- sous-taches (scopees via la tache parente) ----------
+
+def lister_sous_taches_db(user_id, tache_id):
+    with engine.connect() as conn:
+        resultat = conn.execute(
+            text("""
+                SELECT st.id, st.titre, st.terminee
+                FROM sous_taches st
+                JOIN taches t ON t.id = st.tache_id
+                WHERE st.tache_id = :tid AND t.user_id = :uid
+                ORDER BY st.id
+            """),
+            {"tid": tache_id, "uid": user_id},
+        )
+        return [dict(ligne._mapping) for ligne in resultat]
+
+def creer_sous_tache_db(user_id, tache_id, titre):
+    with engine.connect() as conn:
+        tache = conn.execute(
+            text("SELECT id FROM taches WHERE id = :tid AND user_id = :uid"),
+            {"tid": tache_id, "uid": user_id},
+        ).fetchone()
+        if not tache:
+            return None
+        resultat = conn.execute(
+            text("""
+                INSERT INTO sous_taches (tache_id, titre)
+                VALUES (:tid, :titre)
+                RETURNING id, titre, terminee
+            """),
+            {"tid": tache_id, "titre": titre},
+        )
+        conn.commit()
+        return dict(resultat.fetchone()._mapping)
+
+def basculer_sous_tache_db(user_id, sous_tache_id):
+    with engine.connect() as conn:
+        resultat = conn.execute(
+            text("""
+                UPDATE sous_taches SET terminee = NOT terminee
+                WHERE id = :id AND tache_id IN (SELECT id FROM taches WHERE user_id = :uid)
+                RETURNING id, titre, terminee
+            """),
+            {"id": sous_tache_id, "uid": user_id},
+        )
+        conn.commit()
+        ligne = resultat.fetchone()
+        return dict(ligne._mapping) if ligne else None
+
+def supprimer_sous_tache_db(user_id, sous_tache_id):
+    with engine.connect() as conn:
+        resultat = conn.execute(
+            text("""
+                DELETE FROM sous_taches
+                WHERE id = :id AND tache_id IN (SELECT id FROM taches WHERE user_id = :uid)
+            """),
+            {"id": sous_tache_id, "uid": user_id},
+        )
+        conn.commit()
+        return resultat.rowcount > 0
+
+@app.route("/taches/<int:tache_id>/sous-taches", methods=["GET"])
+@token_requis
+def lister_sous_taches(user_id, tache_id):
+    return jsonify(lister_sous_taches_db(user_id, tache_id))
+
+@app.route("/taches/<int:tache_id>/sous-taches", methods=["POST"])
+@token_requis
+def creer_sous_tache(user_id, tache_id):
+    data = request.get_json()
+    if not data or not data.get("titre") or not data["titre"].strip():
+        return jsonify({"erreur": "Le champ 'titre' est requis"}), 400
+
+    sous_tache = creer_sous_tache_db(user_id, tache_id, data["titre"])
+    if sous_tache is None:
+        return jsonify({"erreur": f"Aucune tache avec l'id {tache_id}"}), 404
+    return jsonify(sous_tache), 201
+
+@app.route("/sous-taches/<int:sous_tache_id>", methods=["PUT"])
+@token_requis
+def modifier_sous_tache(user_id, sous_tache_id):
+    sous_tache = basculer_sous_tache_db(user_id, sous_tache_id)
+    if sous_tache is None:
+        return jsonify({"erreur": f"Aucune sous-tache avec l'id {sous_tache_id}"}), 404
+    return jsonify(sous_tache)
+
+@app.route("/sous-taches/<int:sous_tache_id>", methods=["DELETE"])
+@token_requis
+def supprimer_sous_tache(user_id, sous_tache_id):
+    supprime = supprimer_sous_tache_db(user_id, sous_tache_id)
+    if not supprime:
+        return jsonify({"erreur": f"Aucune sous-tache avec l'id {sous_tache_id}"}), 404
+    return "", 204
+
+# ---------- statistiques ----------
+
+def obtenir_stats_db(user_id):
+    with engine.connect() as conn:
+        resultat = conn.execute(
+            text("""
+                SELECT DATE(terminee_le) AS jour, COUNT(*) AS total
+                FROM taches
+                WHERE user_id = :uid AND terminee_le >= NOW() - INTERVAL '14 days'
+                GROUP BY DATE(terminee_le)
+                ORDER BY jour
+            """),
+            {"uid": user_id},
+        )
+        par_jour = {row.jour.isoformat(): row.total for row in resultat}
+
+        dates_completees = {
+            row.jour
+            for row in conn.execute(
+                text("SELECT DISTINCT DATE(terminee_le) AS jour FROM taches WHERE user_id = :uid AND terminee_le IS NOT NULL"),
+                {"uid": user_id},
+            )
+        }
+
+        taches_actives = conn.execute(
+            text("SELECT COUNT(*) FROM taches WHERE user_id = :uid AND terminee = FALSE"),
+            {"uid": user_id},
+        ).scalar()
+        taches_terminees = conn.execute(
+            text("SELECT COUNT(*) FROM taches WHERE user_id = :uid AND terminee = TRUE"),
+            {"uid": user_id},
+        ).scalar()
+
+    serie = 0
+    jour_courant = datetime.now(timezone.utc).date()
+    if jour_courant not in dates_completees:
+        jour_courant -= timedelta(days=1)
+    while jour_courant in dates_completees:
+        serie += 1
+        jour_courant -= timedelta(days=1)
+
+    return {
+        "par_jour": [{"date": d, "total": t} for d, t in sorted(par_jour.items())],
+        "serie_en_cours": serie,
+        "taches_actives": taches_actives,
+        "taches_terminees": taches_terminees,
+    }
+
+@app.route("/stats", methods=["GET"])
+@token_requis
+def stats(user_id):
+    return jsonify(obtenir_stats_db(user_id))
 
 # ---------- assistant ia ----------
 
@@ -320,6 +507,11 @@ FONCTIONS_ASSISTANT = [
                 "date_echeance": {
                     "type": "string",
                     "description": "Date et heure d'echeance au format ISO 8601 (ex: 2026-09-03T14:00:00). Omettre si aucune echeance n'est demandee.",
+                },
+                "recurrence": {
+                    "type": "string",
+                    "enum": ["quotidien", "hebdomadaire"],
+                    "description": "Si la tache doit se repeter automatiquement chaque jour ou chaque semaine. Omettre si la tache ne se repete pas.",
                 },
             },
             "required": ["titre"],
@@ -349,7 +541,9 @@ def executer_fonction_assistant(user_id, nom, args):
     if nom == "lister_taches":
         return {"taches": lister_taches_db(user_id)}
     if nom == "creer_tache":
-        tache = creer_tache_db(user_id, args["titre"], args.get("date_echeance") or None)
+        tache = creer_tache_db(
+            user_id, args["titre"], args.get("date_echeance") or None, args.get("recurrence") or None
+        )
         return {"tache": tache}
     if nom == "basculer_tache":
         tache = basculer_tache_db(user_id, args["tache_id"])
