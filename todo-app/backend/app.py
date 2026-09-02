@@ -386,7 +386,8 @@ def assistant(user_id):
             },
             timeout=30,
         )
-        reponse.raise_for_status()
+        if not reponse.ok:
+            return jsonify({"erreur": f"Erreur assistant IA ({reponse.status_code}) : {reponse.text[:500]}"}), 502
         candidat = reponse.json()["candidates"][0]
         parts = candidat["content"]["parts"]
         historique.append({"role": "model", "parts": parts})
