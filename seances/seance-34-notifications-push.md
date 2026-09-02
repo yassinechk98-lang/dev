@@ -1,5 +1,8 @@
 # Séance 34 (bonus, hors plan initial) — Notifications push + refonte Material UI
 
+Note : le token Netlify a du etre regenere (l'ancien renvoyait "Forbidden" sur le
+deploiement CI/CD), et remplace dans les secrets GitHub.
+
 ## Refonte interface (Material UI v6)
 
 Toute l'interface (LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage,
