@@ -52,6 +52,8 @@ function App() {
   const [charge, setCharge] = useState(false);
   const [enLigne, setEnLigne] = useState([]);
   const [quiEcrit, setQuiEcrit] = useState({});
+  const [connecte, setConnecte] = useState(true);
+  const [nonLus, setNonLus] = useState(0);
 
   const socketRef = useRef(null);
   const finRef = useRef(null);
@@ -71,8 +73,11 @@ function App() {
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      setConnecte(true);
       socket.emit('entrer_salon', { pseudo: pseudoRef.current });
     });
+
+    socket.on('disconnect', () => setConnecte(false));
 
     socket.on('historique', (anciens) => {
       setMessages(anciens);
@@ -81,7 +86,14 @@ function App() {
 
     socket.on('nouveau_message', (message) => {
       setMessages((precedents) => [...precedents, message]);
-      if (message.pseudo !== pseudoRef.current) jouerSonNotification();
+      if (message.pseudo !== pseudoRef.current) {
+        jouerSonNotification();
+        if (document.hidden) setNonLus((n) => n + 1);
+      }
+    });
+
+    socket.on('systeme', ({ texte }) => {
+      setMessages((precedents) => [...precedents, { systeme: true, texte }]);
     });
 
     socket.on('utilisateurs_en_ligne', (liste) => setEnLigne(liste));
@@ -129,6 +141,18 @@ function App() {
     inputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    document.title = nonLus > 0 ? `(${nonLus}) Chat` : 'Chat';
+  }, [nonLus]);
+
+  useEffect(() => {
+    const remettreAZero = () => {
+      if (!document.hidden) setNonLus(0);
+    };
+    document.addEventListener('visibilitychange', remettreAZero);
+    return () => document.removeEventListener('visibilitychange', remettreAZero);
+  }, []);
+
   const basculerMode = () => {
     setMode((m) => {
       const nouveau = m === 'light' ? 'dark' : 'light';
@@ -160,10 +184,15 @@ function App() {
   };
 
   // Regroupe les messages consecutifs du meme pseudo, comme Discord
+  // (les messages systeme restent toujours seuls, jamais regroupes)
   const groupes = [];
   for (const m of messages) {
+    if (m.systeme) {
+      groupes.push({ systeme: true, texte: m.texte });
+      continue;
+    }
     const dernier = groupes[groupes.length - 1];
-    if (dernier && dernier.pseudo === m.pseudo) {
+    if (dernier && !dernier.systeme && dernier.pseudo === m.pseudo) {
       dernier.items.push(m);
     } else {
       groupes.push({ pseudo: m.pseudo, items: [m] });
@@ -239,6 +268,12 @@ function App() {
 
         {/* Zone de chat */}
         <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {!connecte && (
+            <Box sx={{ bgcolor: 'warning.main', color: 'warning.contrastText', px: 2, py: 0.75, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={14} color="inherit" />
+              <Typography variant="caption">Connexion perdue — reconnexion en cours...</Typography>
+            </Box>
+          )}
           <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
             <TagIcon color="action" />
             <Typography variant="subtitle1" fontWeight={700}>Général</Typography>
@@ -261,7 +296,17 @@ function App() {
                 <Typography color="text.secondary">Aucun message pour l'instant — lance la discussion !</Typography>
               </Box>
             ) : (
-              groupes.map((g, i) => (
+              groupes.map((g, i) => g.systeme ? (
+                <Fade in key={i}>
+                  <Typography
+                    variant="caption"
+                    color="text.disabled"
+                    sx={{ textAlign: 'center', fontStyle: 'italic', py: 0.5 }}
+                  >
+                    {g.texte}
+                  </Typography>
+                </Fade>
+              ) : (
                 <Fade in key={i}>
                   <Box sx={{ display: 'flex', gap: 1.5 }}>
                     <Avatar sx={{ width: 36, height: 36, fontSize: 14, bgcolor: couleurPour(g.pseudo), mt: 0.5 }}>
@@ -283,7 +328,7 @@ function App() {
                           placement="left"
                           arrow
                         >
-                          <Typography variant="body2" sx={{ wordBreak: 'break-word', lineHeight: 1.6, width: 'fit-content' }}>
+                          <Typography variant="body2" sx={{ wordBreak: 'break-word', lineHeight: 1.6, width: 'fit-content', whiteSpace: 'pre-wrap' }}>
                             {item.texte}
                           </Typography>
                         </Tooltip>
@@ -317,11 +362,18 @@ function App() {
             >
               <TextField
                 fullWidth
+                multiline
+                maxRows={5}
                 variant="standard"
-                placeholder="Envoyer un message dans #Général"
+                placeholder="Envoyer un message dans #Général (Maj+Entrée pour un retour à la ligne)"
                 value={texte}
                 onChange={(e) => gererFrappe(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && envoyer()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    envoyer();
+                  }
+                }}
                 slotProps={{ input: { disableUnderline: true } }}
                 inputRef={inputRef}
                 sx={{ py: 1 }}

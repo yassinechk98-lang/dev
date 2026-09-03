@@ -46,13 +46,18 @@ def gerer_connexion():
 
 @socketio.on("disconnect")
 def gerer_deconnexion():
-    utilisateurs_connectes.pop(request.sid, None)
+    pseudo_parti = utilisateurs_connectes.pop(request.sid, None)
     emit("utilisateurs_en_ligne", list(utilisateurs_connectes.values()), broadcast=True)
+    if pseudo_parti:
+        emit("systeme", {"texte": f"{pseudo_parti} a quitte le salon"}, broadcast=True)
 
 @socketio.on("entrer_salon")
 def gerer_entree(data):
+    nouveau = request.sid not in utilisateurs_connectes
     utilisateurs_connectes[request.sid] = data["pseudo"]
     emit("utilisateurs_en_ligne", list(utilisateurs_connectes.values()), broadcast=True)
+    if nouveau:
+        emit("systeme", {"texte": f"{data['pseudo']} a rejoint le salon"}, broadcast=True, include_self=False)
 
 @socketio.on("en_train_ecrire")
 def gerer_ecriture(data):
