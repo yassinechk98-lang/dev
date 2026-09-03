@@ -32,12 +32,18 @@
       if (e.key === "Enter") envoyerMessage();
     });
 
-    socket.on("nouveau_message", (data) => {
+    function afficherMessage(data) {
       const div = document.getElementById("messages");
       const p = document.createElement("p");
       p.textContent = `${data.pseudo} : ${data.texte}`;
       div.appendChild(p);
       div.scrollTop = div.scrollHeight;
+    }
+
+    socket.on("nouveau_message", afficherMessage);
+
+    socket.on("historique", (messages) => {
+      messages.forEach(afficherMessage);
     });
   </script>
 </body>
