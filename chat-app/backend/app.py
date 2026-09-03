@@ -53,7 +53,19 @@ with engine.connect() as conn:
         )
     """))
     conn.execute(text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS salon TEXT NOT NULL DEFAULT 'general'"))
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS messages_prives (
+            id SERIAL PRIMARY KEY,
+            expediteur TEXT NOT NULL,
+            destinataire TEXT NOT NULL,
+            texte TEXT NOT NULL,
+            envoye_le TIMESTAMP DEFAULT NOW()
+        )
+    """))
     conn.commit()
+
+def nom_conversation(a, b):
+    return "dm_" + "_".join(sorted([a, b]))
 
 SALONS = ["general", "aleatoire", "aide"]
 utilisateurs_connectes = {}  # sid -> {"username": ..., "salon": ...}
@@ -276,6 +288,66 @@ def gerer_message(data):
         "nouveau_message",
         {"pseudo": infos["username"], "texte": data["texte"], "envoye_le": envoye_le.isoformat()},
         to=infos["salon"],
+    )
+
+# ---------- messages prives ----------
+
+@socketio.on("rejoindre_conversation")
+def gerer_rejoindre_conversation(data):
+    autre = data.get("avec")
+    infos = utilisateurs_connectes.get(request.sid)
+    if not infos or not autre:
+        return
+
+    ancienne = infos.get("conversation")
+    if ancienne:
+        leave_room(ancienne)
+
+    conversation = nom_conversation(infos["username"], autre)
+    infos["conversation"] = conversation
+    infos["conversation_avec"] = autre
+    join_room(conversation)
+
+    with engine.connect() as conn:
+        resultat = conn.execute(
+            text("""
+                SELECT expediteur, destinataire, texte, envoye_le FROM messages_prives
+                WHERE (expediteur = :moi AND destinataire = :autre) OR (expediteur = :autre AND destinataire = :moi)
+                ORDER BY id DESC LIMIT 30
+            """),
+            {"moi": infos["username"], "autre": autre},
+        )
+        derniers_messages = [dict(ligne._mapping) for ligne in resultat]
+    for m in derniers_messages:
+        m["envoye_le"] = m["envoye_le"].isoformat()
+    derniers_messages.reverse()
+    emit("historique_prive", derniers_messages)
+
+@socketio.on("message_prive_envoye")
+def gerer_message_prive(data):
+    infos = utilisateurs_connectes.get(request.sid)
+    if not infos or not infos.get("conversation"):
+        return
+    autre = infos["conversation_avec"]
+    with engine.connect() as conn:
+        resultat = conn.execute(
+            text("""
+                INSERT INTO messages_prives (expediteur, destinataire, texte)
+                VALUES (:e, :d, :t) RETURNING envoye_le
+            """),
+            {"e": infos["username"], "d": autre, "t": data["texte"]},
+        )
+        envoye_le = resultat.fetchone()[0]
+        conn.commit()
+    emit(
+        "nouveau_message_prive",
+        {
+            "expediteur": infos["username"],
+            "destinataire": autre,
+            "texte": data["texte"],
+            "envoye_le": envoye_le.isoformat(),
+        },
+        to=infos["conversation"],
     )
 
 if __name__ == "__main__":

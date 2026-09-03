@@ -12,6 +12,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import ForumIcon from '@mui/icons-material/Forum';
 import CircleIcon from '@mui/icons-material/Circle';
 import LogoutIcon from '@mui/icons-material/Logout';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { creerTheme } from './theme';
 import { SOCKET_URL } from './api';
 import AuthPage from './AuthPage';
@@ -51,8 +52,10 @@ function jouerSonNotification() {
 function ChatApp({ token, pseudo, deconnexion }) {
   const [mode, setMode] = useState(() => localStorage.getItem('chat-theme') || 'light');
   const [salonActif, setSalonActif] = useState('general');
+  const [dmActif, setDmActif] = useState(null);
   const [texte, setTexte] = useState('');
   const [messages, setMessages] = useState([]);
+  const [messagesPrivees, setMessagesPrivees] = useState([]);
   const [charge, setCharge] = useState(false);
   const [enLigne, setEnLigne] = useState([]);
   const [quiEcrit, setQuiEcrit] = useState({});
@@ -100,6 +103,19 @@ function ChatApp({ token, pseudo, deconnexion }) {
       setMessages((precedents) => [...precedents, { systeme: true, texte }]);
     });
 
+    socket.on('historique_prive', (anciens) => {
+      setMessagesPrivees(anciens);
+      setCharge(true);
+    });
+
+    socket.on('nouveau_message_prive', (message) => {
+      setMessagesPrivees((precedents) => [...precedents, message]);
+      if (message.expediteur !== pseudoRef.current) {
+        jouerSonNotification();
+        if (document.hidden) setNonLus((n) => n + 1);
+      }
+    });
+
     socket.on('utilisateurs_en_ligne', (liste) => setEnLigne(liste));
 
     socket.on('quelquun_ecrit', ({ pseudo: p }) => {
@@ -120,12 +136,27 @@ function ChatApp({ token, pseudo, deconnexion }) {
 
   // change de salon : previens le serveur, vide l'affichage en attendant le nouvel historique
   useEffect(() => {
-    if (!socketRef.current?.connected) return;
+    if (!socketRef.current?.connected || dmActif) return;
     setCharge(false);
     setMessages([]);
     setQuiEcrit({});
     socketRef.current.emit('rejoindre_salon', { salon: salonActif });
-  }, [salonActif]);
+  }, [salonActif, dmActif]);
+
+  const ouvrirDm = (avec) => {
+    if (avec === pseudo) return;
+    setCharge(false);
+    setMessagesPrivees([]);
+    setDmActif(avec);
+    socketRef.current.emit('rejoindre_conversation', { avec });
+  };
+
+  const revenirAuSalon = () => {
+    setDmActif(null);
+    setCharge(false);
+    setMessages([]);
+    socketRef.current.emit('rejoindre_salon', { salon: salonActif });
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -143,11 +174,11 @@ function ChatApp({ token, pseudo, deconnexion }) {
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, messagesPrivees]);
 
   useEffect(() => {
     inputRef.current?.focus();
-  }, [salonActif]);
+  }, [salonActif, dmActif]);
 
   useEffect(() => {
     document.title = nonLus > 0 ? `(${nonLus}) Chat` : 'Chat';
@@ -171,6 +202,7 @@ function ChatApp({ token, pseudo, deconnexion }) {
 
   const gererFrappe = (valeur) => {
     setTexte(valeur);
+    if (dmActif) return;
     if (!enTrainDecrireRef.current) {
       enTrainDecrireRef.current = true;
       socketRef.current.emit('en_train_ecrire');
@@ -184,15 +216,23 @@ function ChatApp({ token, pseudo, deconnexion }) {
 
   const envoyer = () => {
     if (!texte.trim()) return;
-    socketRef.current.emit('message_envoye', { texte: texte.trim() });
+    if (dmActif) {
+      socketRef.current.emit('message_prive_envoye', { texte: texte.trim() });
+    } else {
+      socketRef.current.emit('message_envoye', { texte: texte.trim() });
+      clearTimeout(timeoutFrappeRef.current);
+      enTrainDecrireRef.current = false;
+      socketRef.current.emit('arrete_ecrire');
+    }
     setTexte('');
-    clearTimeout(timeoutFrappeRef.current);
-    enTrainDecrireRef.current = false;
-    socketRef.current.emit('arrete_ecrire');
   };
 
+  const messagesAffiches = dmActif
+    ? messagesPrivees.map((m) => ({ pseudo: m.expediteur, texte: m.texte, envoye_le: m.envoye_le }))
+    : messages;
+
   const groupes = [];
-  for (const m of messages) {
+  for (const m of messagesAffiches) {
     if (m.systeme) {
       groupes.push({ systeme: true, texte: m.texte });
       continue;
@@ -230,8 +270,8 @@ function ChatApp({ token, pseudo, deconnexion }) {
             {SALONS.map((salon) => (
               <ListItemButton
                 key={salon}
-                selected={salon === salonActif}
-                onClick={() => setSalonActif(salon)}
+                selected={!dmActif && salon === salonActif}
+                onClick={() => { setSalonActif(salon); setDmActif(null); }}
                 sx={{ borderRadius: 2 }}
               >
                 <ListItemIcon sx={{ minWidth: 32 }}><TagIcon fontSize="small" /></ListItemIcon>
@@ -247,13 +287,19 @@ function ChatApp({ token, pseudo, deconnexion }) {
           </Box>
           <List sx={{ px: 1, flexGrow: 1, overflowY: 'auto' }}>
             {enLigne.map((p) => (
-              <Box key={p} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1, py: 0.5 }}>
-                <Avatar sx={{ width: 24, height: 24, fontSize: 12, bgcolor: couleurPour(p) }}>
+              <ListItemButton
+                key={p}
+                selected={dmActif === p}
+                onClick={() => ouvrirDm(p)}
+                disabled={p === pseudo}
+                sx={{ borderRadius: 2, py: 0.5 }}
+              >
+                <Avatar sx={{ width: 24, height: 24, fontSize: 12, bgcolor: couleurPour(p), mr: 1 }}>
                   {p.slice(0, 1).toUpperCase()}
                 </Avatar>
-                <Typography variant="body2" noWrap sx={{ flexGrow: 1 }}>{p}</Typography>
+                <ListItemText primary={p === pseudo ? `${p} (toi)` : p} slotProps={{ primary: { noWrap: true } }} />
                 <CircleIcon sx={{ fontSize: 8, color: 'success.main' }} />
-              </Box>
+              </ListItemButton>
             ))}
           </List>
 
@@ -283,14 +329,26 @@ function ChatApp({ token, pseudo, deconnexion }) {
             </Box>
           )}
           <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TagIcon color="action" />
-            <Typography variant="subtitle1" fontWeight={700}>{salonActif}</Typography>
-            {enLigne.length > 0 && (
-              <AvatarGroup max={5} sx={{ ml: 'auto', '& .MuiAvatar-root': { width: 24, height: 24, fontSize: 11 } }}>
-                {enLigne.map((p) => (
-                  <Avatar key={p} sx={{ bgcolor: couleurPour(p) }}>{p.slice(0, 1).toUpperCase()}</Avatar>
-                ))}
-              </AvatarGroup>
+            {dmActif ? (
+              <>
+                <IconButton size="small" onClick={revenirAuSalon}><ArrowBackIcon fontSize="small" /></IconButton>
+                <Avatar sx={{ width: 26, height: 26, fontSize: 12, bgcolor: couleurPour(dmActif) }}>
+                  {dmActif.slice(0, 1).toUpperCase()}
+                </Avatar>
+                <Typography variant="subtitle1" fontWeight={700}>{dmActif}</Typography>
+              </>
+            ) : (
+              <>
+                <TagIcon color="action" />
+                <Typography variant="subtitle1" fontWeight={700}>{salonActif}</Typography>
+                {enLigne.length > 0 && (
+                  <AvatarGroup max={5} sx={{ ml: 'auto', '& .MuiAvatar-root': { width: 24, height: 24, fontSize: 11 } }}>
+                    {enLigne.map((p) => (
+                      <Avatar key={p} sx={{ bgcolor: couleurPour(p) }}>{p.slice(0, 1).toUpperCase()}</Avatar>
+                    ))}
+                  </AvatarGroup>
+                )}
+              </>
             )}
           </Box>
 
@@ -341,7 +399,7 @@ function ChatApp({ token, pseudo, deconnexion }) {
           </Box>
 
           <Box sx={{ px: 2, height: 22 }}>
-            <Fade in={autresQuiEcrivent.length > 0}>
+            <Fade in={!dmActif && autresQuiEcrivent.length > 0}>
               <Typography variant="caption" color="text.secondary" fontStyle="italic">
                 {autresQuiEcrivent.join(', ')} {autresQuiEcrivent.length > 1 ? 'sont' : 'est'} en train d'écrire...
               </Typography>
@@ -355,7 +413,7 @@ function ChatApp({ token, pseudo, deconnexion }) {
                 multiline
                 maxRows={5}
                 variant="standard"
-                placeholder={`Envoyer un message dans #${salonActif} (Maj+Entrée pour un retour à la ligne)`}
+                placeholder={dmActif ? `Message a ${dmActif} (Maj+Entrée pour un retour à la ligne)` : `Envoyer un message dans #${salonActif} (Maj+Entrée pour un retour à la ligne)`}
                 value={texte}
                 onChange={(e) => gererFrappe(e.target.value)}
                 onKeyDown={(e) => {
