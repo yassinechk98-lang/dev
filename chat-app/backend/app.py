@@ -15,5 +15,10 @@ def gerer_ping(data):
     print("recu du client:", data)
     emit("pong_serveur", {"message": "Pong depuis le serveur !"})
 
+@socketio.on("message_envoye")
+def gerer_message(data):
+    print("message recu:", data)
+    emit("nouveau_message", {"pseudo": data["pseudo"], "texte": data["texte"]}, broadcast=True)
+
 if __name__ == "__main__":
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True, port=5050)

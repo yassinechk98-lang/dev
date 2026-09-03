@@ -2,27 +2,42 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Chat - Hello World WebSocket</title>
+  <title>Chat - Salon</title>
 </head>
 <body>
-  <h1>Test WebSocket</h1>
-  <button onclick="envoyerPing()">Envoyer un ping</button>
-  <p id="reponse">En attente...</p>
+  <h1>Salon de discussion</h1>
+
+  <p>
+    Pseudo : <input type="text" id="pseudo" value="Anonyme" />
+  </p>
+
+  <div id="messages" style="border: 1px solid #ccc; height: 200px; overflow-y: auto; padding: 8px;"></div>
+
+  <input type="text" id="texte" placeholder="Ecris un message..." />
+  <button onclick="envoyerMessage()">Envoyer</button>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
     const socket = io();
 
-    function envoyerPing() {
-      socket.emit("ping_client", { texte: "salut serveur" });
+    function envoyerMessage() {
+      const pseudo = document.getElementById("pseudo").value || "Anonyme";
+      const texte = document.getElementById("texte").value.trim();
+      if (!texte) return;
+      socket.emit("message_envoye", { pseudo, texte });
+      document.getElementById("texte").value = "";
     }
 
-    socket.on("pong_serveur", (data) => {
-      document.getElementById("reponse").innerText = data.message;
+    document.getElementById("texte").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") envoyerMessage();
     });
 
-    socket.on("connect", () => {
-      console.log("Connecte au serveur via WebSocket, id:", socket.id);
+    socket.on("nouveau_message", (data) => {
+      const div = document.getElementById("messages");
+      const p = document.createElement("p");
+      p.textContent = `${data.pseudo} : ${data.texte}`;
+      div.appendChild(p);
+      div.scrollTop = div.scrollHeight;
     });
   </script>
 </body>

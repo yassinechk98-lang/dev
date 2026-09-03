@@ -20,7 +20,7 @@ ouverte, dans les deux sens.
 ## Programme
 
 - [x] Séance 1 — Théorie WebSockets (HTTP vs connexion permanente) + "Hello World" temps réel
-- [ ] Séance 2 — Salons : envoyer/recevoir un message en direct entre plusieurs onglets
+- [x] Séance 2 — Salons : envoyer/recevoir un message en direct entre plusieurs onglets
 - [ ] Séance 3 — Persistance : sauvegarder les messages en base, les recharger a la connexion
 - [ ] Séance 4 — Interface React du chat (liste de messages, champ d'envoi)
 - [ ] Séance 5 — Authentification JWT sur les WebSockets + plusieurs salons distincts
