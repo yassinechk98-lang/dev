@@ -26,7 +26,7 @@ ouverte, dans les deux sens.
 - [x] Bonus — Relookage Material UI v9 (style Discord : barre laterale, utilisateurs en ligne, indicateur de frappe, son de notification, horodatage) — anticipe une partie de la Seance 7
 - [x] Séance 5 — Authentification JWT sur les WebSockets + plusieurs salons distincts
 - [x] Séance 6 — Messages prives (DM) entre deux utilisateurs
-- [ ] Séance 7 — Finitions : "X est en train d'ecrire...", utilisateurs en ligne
+- [x] Séance 7 — Finitions : "X est en train d'ecrire...", utilisateurs en ligne (livre pendant le bonus MUI ci-dessus)
 - [ ] Séance 8 — Deploiement (nouveau service Render + nouveau site Netlify)
 
 ## Structure du dossier chat-app/
