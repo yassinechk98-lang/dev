@@ -16,3 +16,6 @@ dev-dist/
 # Outils / config locale
 .claude/
 .vscode/
+
+# chat-app a son propre depot git separe (github.com/yassinechkir38-del/chat-app)
+chat-app/

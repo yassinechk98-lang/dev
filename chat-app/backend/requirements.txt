@@ -1,9 +1,0 @@
-Flask
-flask-socketio
-simple-websocket
-eventlet
-sqlalchemy
-psycopg2-binary
-python-dotenv
-pyjwt
-requests
