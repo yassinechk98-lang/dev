@@ -22,7 +22,7 @@ ouverte, dans les deux sens.
 - [x] Séance 1 — Théorie WebSockets (HTTP vs connexion permanente) + "Hello World" temps réel
 - [x] Séance 2 — Salons : envoyer/recevoir un message en direct entre plusieurs onglets
 - [x] Séance 3 — Persistance : sauvegarder les messages en base, les recharger a la connexion
-- [ ] Séance 4 — Interface React du chat (liste de messages, champ d'envoi)
+- [x] Séance 4 — Interface React du chat (liste de messages, champ d'envoi)
 - [ ] Séance 5 — Authentification JWT sur les WebSockets + plusieurs salons distincts
 - [ ] Séance 6 — Messages prives (DM) entre deux utilisateurs
 - [ ] Séance 7 — Finitions : "X est en train d'ecrire...", utilisateurs en ligne
