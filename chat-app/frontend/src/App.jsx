@@ -11,9 +11,13 @@ import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import ForumIcon from '@mui/icons-material/Forum';
 import CircleIcon from '@mui/icons-material/Circle';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { creerTheme } from './theme';
+import { SOCKET_URL } from './api';
+import AuthPage from './AuthPage';
 
 const COULEURS = ['#6750A4', '#386A20', '#984061', '#006A6A', '#8B5000', '#31538A'];
+const SALONS = ['general', 'aleatoire', 'aide'];
 
 function couleurPour(pseudo) {
   let somme = 0;
@@ -44,9 +48,9 @@ function jouerSonNotification() {
   }
 }
 
-function App() {
+function ChatApp({ token, pseudo, deconnexion }) {
   const [mode, setMode] = useState(() => localStorage.getItem('chat-theme') || 'light');
-  const [pseudo, setPseudo] = useState(() => localStorage.getItem('chat-pseudo') || 'Anonyme');
+  const [salonActif, setSalonActif] = useState('general');
   const [texte, setTexte] = useState('');
   const [messages, setMessages] = useState([]);
   const [charge, setCharge] = useState(false);
@@ -69,12 +73,12 @@ function App() {
   }, [pseudo]);
 
   useEffect(() => {
-    const socket = io('http://127.0.0.1:5050');
+    const socket = io(SOCKET_URL, { auth: { token } });
     socketRef.current = socket;
 
     socket.on('connect', () => {
       setConnecte(true);
-      socket.emit('entrer_salon', { pseudo: pseudoRef.current });
+      socket.emit('rejoindre_salon', { salon: salonActif });
     });
 
     socket.on('disconnect', () => setConnecte(false));
@@ -111,9 +115,18 @@ function App() {
     });
 
     return () => socket.disconnect();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
-  // nettoie les indicateurs de frappe restes bloques (securite si l'evenement d'arret est rate)
+  // change de salon : previens le serveur, vide l'affichage en attendant le nouvel historique
+  useEffect(() => {
+    if (!socketRef.current?.connected) return;
+    setCharge(false);
+    setMessages([]);
+    setQuiEcrit({});
+    socketRef.current.emit('rejoindre_salon', { salon: salonActif });
+  }, [salonActif]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setQuiEcrit((prev) => {
@@ -133,13 +146,8 @@ function App() {
   }, [messages]);
 
   useEffect(() => {
-    localStorage.setItem('chat-pseudo', pseudo);
-    socketRef.current?.emit('entrer_salon', { pseudo });
-  }, [pseudo]);
-
-  useEffect(() => {
     inputRef.current?.focus();
-  }, []);
+  }, [salonActif]);
 
   useEffect(() => {
     document.title = nonLus > 0 ? `(${nonLus}) Chat` : 'Chat';
@@ -165,26 +173,24 @@ function App() {
     setTexte(valeur);
     if (!enTrainDecrireRef.current) {
       enTrainDecrireRef.current = true;
-      socketRef.current.emit('en_train_ecrire', { pseudo });
+      socketRef.current.emit('en_train_ecrire');
     }
     clearTimeout(timeoutFrappeRef.current);
     timeoutFrappeRef.current = setTimeout(() => {
       enTrainDecrireRef.current = false;
-      socketRef.current.emit('arrete_ecrire', { pseudo });
+      socketRef.current.emit('arrete_ecrire');
     }, 1500);
   };
 
   const envoyer = () => {
     if (!texte.trim()) return;
-    socketRef.current.emit('message_envoye', { pseudo: pseudo || 'Anonyme', texte: texte.trim() });
+    socketRef.current.emit('message_envoye', { texte: texte.trim() });
     setTexte('');
     clearTimeout(timeoutFrappeRef.current);
     enTrainDecrireRef.current = false;
-    socketRef.current.emit('arrete_ecrire', { pseudo });
+    socketRef.current.emit('arrete_ecrire');
   };
 
-  // Regroupe les messages consecutifs du meme pseudo, comme Discord
-  // (les messages systeme restent toujours seuls, jamais regroupes)
   const groupes = [];
   for (const m of messages) {
     if (m.systeme) {
@@ -205,7 +211,6 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ height: '100vh', display: 'flex', bgcolor: 'background.default' }}>
-        {/* Barre laterale des salons */}
         <Box
           sx={{
             width: 260,
@@ -222,10 +227,17 @@ function App() {
             <Typography variant="h6" fontWeight={700}>Chat</Typography>
           </Box>
           <List sx={{ px: 1 }}>
-            <ListItemButton selected sx={{ borderRadius: 2 }}>
-              <ListItemIcon sx={{ minWidth: 32 }}><TagIcon fontSize="small" /></ListItemIcon>
-              <ListItemText primary="Général" />
-            </ListItemButton>
+            {SALONS.map((salon) => (
+              <ListItemButton
+                key={salon}
+                selected={salon === salonActif}
+                onClick={() => setSalonActif(salon)}
+                sx={{ borderRadius: 2 }}
+              >
+                <ListItemIcon sx={{ minWidth: 32 }}><TagIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primary={salon} />
+              </ListItemButton>
+            ))}
           </List>
 
           <Box sx={{ px: 2, pt: 2, pb: 1 }}>
@@ -246,27 +258,23 @@ function App() {
           </List>
 
           <Box sx={{ px: 2, py: 1.5, borderTop: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Avatar sx={{ width: 30, height: 30, fontSize: 14, bgcolor: couleurPour(pseudo || 'A') }}>
-              {(pseudo || 'A').slice(0, 1).toUpperCase()}
+            <Avatar sx={{ width: 30, height: 30, fontSize: 14, bgcolor: couleurPour(pseudo) }}>
+              {pseudo.slice(0, 1).toUpperCase()}
             </Avatar>
-            <TextField
-              value={pseudo}
-              onChange={(e) => setPseudo(e.target.value)}
-              size="small"
-              variant="standard"
-              placeholder="Ton pseudo"
-              sx={{ flexGrow: 1 }}
-              slotProps={{ input: { disableUnderline: true } }}
-            />
+            <Typography variant="body2" noWrap sx={{ flexGrow: 1 }} fontWeight={600}>{pseudo}</Typography>
             <Tooltip title={mode === 'light' ? 'Mode sombre' : 'Mode clair'}>
               <IconButton size="small" onClick={basculerMode}>
                 {mode === 'light' ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
               </IconButton>
             </Tooltip>
+            <Tooltip title="Deconnexion">
+              <IconButton size="small" onClick={deconnexion}>
+                <LogoutIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
         </Box>
 
-        {/* Zone de chat */}
         <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {!connecte && (
             <Box sx={{ bgcolor: 'warning.main', color: 'warning.contrastText', px: 2, py: 0.75, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -276,7 +284,7 @@ function App() {
           )}
           <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
             <TagIcon color="action" />
-            <Typography variant="subtitle1" fontWeight={700}>Général</Typography>
+            <Typography variant="subtitle1" fontWeight={700}>{salonActif}</Typography>
             {enLigne.length > 0 && (
               <AvatarGroup max={5} sx={{ ml: 'auto', '& .MuiAvatar-root': { width: 24, height: 24, fontSize: 11 } }}>
                 {enLigne.map((p) => (
@@ -298,11 +306,7 @@ function App() {
             ) : (
               groupes.map((g, i) => g.systeme ? (
                 <Fade in key={i}>
-                  <Typography
-                    variant="caption"
-                    color="text.disabled"
-                    sx={{ textAlign: 'center', fontStyle: 'italic', py: 0.5 }}
-                  >
+                  <Typography variant="caption" color="text.disabled" sx={{ textAlign: 'center', fontStyle: 'italic', py: 0.5 }}>
                     {g.texte}
                   </Typography>
                 </Fade>
@@ -322,12 +326,7 @@ function App() {
                         )}
                       </Box>
                       {g.items.map((item, j) => (
-                        <Tooltip
-                          key={j}
-                          title={item.envoye_le ? formaterHeure(item.envoye_le) : ''}
-                          placement="left"
-                          arrow
-                        >
+                        <Tooltip key={j} title={item.envoye_le ? formaterHeure(item.envoye_le) : ''} placement="left" arrow>
                           <Typography variant="body2" sx={{ wordBreak: 'break-word', lineHeight: 1.6, width: 'fit-content', whiteSpace: 'pre-wrap' }}>
                             {item.texte}
                           </Typography>
@@ -350,22 +349,13 @@ function App() {
           </Box>
 
           <Box sx={{ px: 2, pb: 2, pt: 0.5 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                bgcolor: mode === 'light' ? 'grey.100' : 'grey.900',
-                borderRadius: 3,
-                px: 1.5,
-              }}
-            >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: mode === 'light' ? 'grey.100' : 'grey.900', borderRadius: 3, px: 1.5 }}>
               <TextField
                 fullWidth
                 multiline
                 maxRows={5}
                 variant="standard"
-                placeholder="Envoyer un message dans #Général (Maj+Entrée pour un retour à la ligne)"
+                placeholder={`Envoyer un message dans #${salonActif} (Maj+Entrée pour un retour à la ligne)`}
                 value={texte}
                 onChange={(e) => gererFrappe(e.target.value)}
                 onKeyDown={(e) => {
@@ -387,6 +377,31 @@ function App() {
       </Box>
     </ThemeProvider>
   );
+}
+
+function App() {
+  const [token, setToken] = useState(() => localStorage.getItem('chat-token'));
+  const [pseudo, setPseudo] = useState(() => localStorage.getItem('chat-username'));
+
+  const seConnecter = (nouveauToken, nouveauPseudo) => {
+    localStorage.setItem('chat-token', nouveauToken);
+    localStorage.setItem('chat-username', nouveauPseudo);
+    setToken(nouveauToken);
+    setPseudo(nouveauPseudo);
+  };
+
+  const deconnexion = () => {
+    localStorage.removeItem('chat-token');
+    localStorage.removeItem('chat-username');
+    setToken(null);
+    setPseudo(null);
+  };
+
+  if (!token || !pseudo) {
+    return <AuthPage onConnecte={seConnecter} />;
+  }
+
+  return <ChatApp token={token} pseudo={pseudo} deconnexion={deconnexion} />;
 }
 
 export default App;
