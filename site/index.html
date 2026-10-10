@@ -6,62 +6,166 @@
 <title>FreeAV – Antivirus gratuit et open source</title>
 <meta name="description" content="FreeAV est un antivirus gratuit et open source basé sur les signatures ClamAV. Analysez vos fichiers sans publicité ni abonnement.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 2 4 7v8c0 7.5 5.1 13.4 12 15 6.9-1.6 12-7.5 12-15V7z' fill='%2316a34a'/><path d='m11 16 4 4 7-8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<script>document.documentElement.classList.add('js')</script>
 <style>
 :root{
   --bg:#f7faf8; --surface:#ffffff; --text:#0f1a14; --muted:#526158; --border:#dfe7e2;
   --accent:#16a34a; --accent-strong:#15803d; --accent-soft:#e7f6ec; --on-accent:#ffffff;
+  --accent-2:#0284c7; --danger:#dc2626; --danger-soft:#fdecec; --blob:.22; --shadow:rgba(15,26,20,.18);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0b110e; --surface:#121a16; --text:#e8f0eb; --muted:#9aaba1; --border:#24302a;
     --accent:#22c55e; --accent-strong:#4ade80; --accent-soft:#132a1c; --on-accent:#05210f;
+    --accent-2:#38bdf8; --danger:#f87171; --danger-soft:#2a1414; --blob:.16; --shadow:rgba(0,0,0,.5);
   }
 }
 :root[data-theme="dark"]{
   --bg:#0b110e; --surface:#121a16; --text:#e8f0eb; --muted:#9aaba1; --border:#24302a;
   --accent:#22c55e; --accent-strong:#4ade80; --accent-soft:#132a1c; --on-accent:#05210f;
+  --accent-2:#38bdf8; --danger:#f87171; --danger-soft:#2a1414; --blob:.16; --shadow:rgba(0,0,0,.5);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 a{color:var(--accent-strong)}
 .wrap{max-width:1040px;margin:0 auto;padding:0 16px}
-header{border-bottom:1px solid var(--border);background:var(--surface)}
+header{position:sticky;top:0;z-index:20;border-bottom:1px solid var(--border);background:var(--surface);transition:box-shadow .3s}
+header.scrolled{box-shadow:0 8px 24px -16px var(--shadow)}
 header .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
 .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;color:var(--text);text-decoration:none}
+.logo svg{transition:transform .4s cubic-bezier(.3,1.6,.5,1)}
+.logo:hover svg{transform:rotate(-10deg) scale(1.1)}
 nav{display:flex;gap:20px}
-nav a{color:var(--muted);text-decoration:none;font-size:15px}
+nav a{position:relative;color:var(--muted);text-decoration:none;font-size:15px;transition:color .2s}
+nav a::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:2px;border-radius:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .25s ease}
 nav a:hover{color:var(--text)}
-.hero{padding:72px 0 56px;text-align:center}
+nav a:hover::after{transform:scaleX(1)}
+
+/* Hero */
+.hero-bg{position:relative;overflow:hidden}
+.hero-bg::before,.hero-bg::after{content:"";position:absolute;width:420px;height:420px;border-radius:50%;filter:blur(70px);opacity:var(--blob);pointer-events:none}
+.hero-bg::before{background:var(--accent);top:-170px;left:-140px;animation:drift 14s ease-in-out infinite alternate}
+.hero-bg::after{background:var(--accent-2);bottom:-220px;right:-160px;animation:drift 18s ease-in-out infinite alternate-reverse}
+.hero{position:relative;z-index:1;padding:64px 0 56px;text-align:center}
+.hero > *{animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) backwards}
+.hero > :nth-child(2){animation-delay:.1s}
+.hero > :nth-child(3){animation-delay:.2s}
+.hero > :nth-child(4){animation-delay:.3s}
+.hero > :nth-child(5){animation-delay:.4s}
+.hero > :nth-child(6){animation-delay:.5s}
+.hero > :nth-child(7){animation-delay:.65s}
+.emblem{position:relative;width:88px;height:88px;margin:0 auto 20px;display:grid;place-items:center}
+.emblem svg{position:relative;animation:float 4s ease-in-out infinite}
+.ring{position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);opacity:0;animation:ring 3s ease-out infinite}
+.ring:nth-child(2){animation-delay:1s}
+.ring:nth-child(3){animation-delay:2s}
+.beam{animation:beam 2.8s ease-in-out infinite}
+.check{stroke-dasharray:32;animation:draw .7s ease-out .9s backwards}
 .badge{display:inline-block;background:var(--accent-soft);color:var(--accent-strong);padding:4px 12px;border-radius:999px;font-size:14px;font-weight:600}
 h1{font-size:clamp(32px,6vw,52px);line-height:1.1;margin:18px 0 16px;letter-spacing:-.02em}
+.grad{background:linear-gradient(90deg,var(--accent-strong),var(--accent-2),var(--accent-strong));background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradmove 6s linear infinite}
 .lead{color:var(--muted);font-size:clamp(17px,2.4vw,20px);max-width:640px;margin:0 auto 32px}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 26px;border-radius:10px;font-weight:600;text-decoration:none;font-size:17px}
-.btn-primary{background:var(--accent);color:var(--on-accent)}
-.btn-primary:hover{background:var(--accent-strong)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 26px;border-radius:10px;font-weight:600;text-decoration:none;font-size:17px;transition:transform .2s ease,box-shadow .2s ease,background .2s ease,border-color .2s ease}
+.btn:hover{transform:translateY(-2px)}
+.btn:active{transform:translateY(0)}
+.btn-primary{position:relative;overflow:hidden;background:var(--accent);color:var(--on-accent);box-shadow:0 8px 22px -12px var(--accent)}
+.btn-primary:hover{background:var(--accent-strong);box-shadow:0 12px 26px -12px var(--accent)}
+.shine::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.4) 50%,transparent 65%);transform:translateX(-120%);animation:shine 4s ease-in-out 1.5s infinite}
 .btn-ghost{border:1px solid var(--border);color:var(--text);background:var(--surface)}
+.btn-ghost:hover{border-color:var(--accent)}
+.btn svg{flex:none;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.btn:hover .dl{animation:bounce .8s ease-in-out infinite}
 .ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
 .note{color:var(--muted);font-size:14px;margin-top:14px}
-section{padding:56px 0}
+
+/* Démo d'analyse */
+.scan-demo{max-width:520px;margin:40px auto 0;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 24px 48px -28px var(--shadow);overflow:hidden}
+.scan-top{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;color:var(--muted)}
+.dots{display:flex;gap:6px}
+.dots i{width:10px;height:10px;border-radius:50%;background:var(--border)}
+.scan-body{padding:18px}
+.scan-row{display:flex;justify-content:space-between;align-items:center;gap:12px;font-weight:600}
+.scan-status{display:flex;align-items:center;gap:8px}
+.scan-status::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent);animation:blink 1s ease-in-out infinite}
+.scan-demo.done .scan-status::before{animation:none;width:16px;height:16px;background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8.5 2.5 2.5L12 5.5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat}
+.scan-pct{font-variant-numeric:tabular-nums;color:var(--accent-strong)}
+.bar{height:8px;border-radius:999px;background:var(--accent-soft);margin:12px 0 10px;overflow:hidden}
+.bar span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:inherit;transform:scaleX(0);transform-origin:left}
+.scan-file{font:13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scan-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.scan-stats div{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.scan-stats b{display:block;font-size:22px;font-variant-numeric:tabular-nums;transition:color .3s}
+.scan-stats span{font-size:13px;color:var(--muted)}
+.scan-alert{display:flex;gap:8px;align-items:flex-start;margin-top:0;max-height:0;opacity:0;overflow:hidden;border-radius:10px;background:var(--danger-soft);color:var(--danger);font-size:14px;font-weight:600;padding:0 12px;transition:max-height .4s ease,opacity .4s ease,margin .4s ease,padding .4s ease}
+.scan-demo.alert .scan-alert{max-height:90px;opacity:1;margin-top:12px;padding:10px 12px;animation:shake .45s ease .1s}
+.scan-demo.alert .threats{color:var(--danger)}
+
+/* Sections */
+section{padding:56px 0;scroll-margin-top:64px}
 h2{font-size:clamp(26px,4vw,34px);margin:0 0 10px;text-align:center;letter-spacing:-.01em}
 .sub{color:var(--muted);text-align:center;margin:0 auto 36px;max-width:600px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease}
+.card:hover{transform:translateY(-5px);border-color:var(--accent);box-shadow:0 16px 32px -20px var(--shadow)}
 .card h3{margin:12px 0 6px;font-size:18px}
 .card p{margin:0;color:var(--muted);font-size:15px}
-.icon{width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center}
+.icon{width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center;transition:background .25s}
+.card:hover .icon{animation:wiggle .55s ease}
 .icon svg{width:22px;height:22px;stroke:var(--accent-strong);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .steps{counter-reset:s;display:grid;gap:12px;max-width:640px;margin:0 auto;padding:0;list-style:none}
-.steps li{counter-increment:s;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px 16px 60px;position:relative}
+.steps li{counter-increment:s;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px 16px 60px;position:relative;transition:border-color .25s,transform .25s}
+.steps li:hover{border-color:var(--accent);transform:translateX(4px)}
 .steps li::before{content:counter(s);position:absolute;left:18px;top:16px;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:700;font-size:14px}
-.download{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:40px 24px;text-align:center}
+.download{border:2px solid transparent;border-radius:18px;padding:40px 24px;text-align:center;background:linear-gradient(var(--surface),var(--surface)) padding-box,conic-gradient(from var(--angle),var(--border) 0deg,var(--accent) 60deg,var(--accent-2) 120deg,var(--border) 180deg,var(--border) 360deg) border-box;animation:spin-border 6s linear infinite}
 .platforms{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0 26px}
-.platforms span{border:1px solid var(--border);border-radius:999px;padding:6px 14px;font-size:14px;color:var(--muted)}
-details{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;max-width:720px;margin:0 auto 10px}
-summary{cursor:pointer;font-weight:600}
+.platforms span{border:1px solid var(--border);border-radius:999px;padding:6px 14px;font-size:14px;color:var(--muted);transition:border-color .2s,color .2s,transform .2s}
+.platforms span:hover{border-color:var(--accent);color:var(--text);transform:translateY(-2px)}
+details{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;max-width:720px;margin:0 auto 10px;transition:border-color .25s}
+details[open],details:hover{border-color:var(--accent)}
+summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent-strong);display:grid;place-items:center;font-size:18px;line-height:1;transition:transform .3s ease}
+details[open] summary::after{transform:rotate(45deg)}
 details p{color:var(--muted);margin:10px 0 0}
+details[open] p{animation:fadeDown .35s ease}
 footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font-size:14px;text-align:center}
-@media (max-width:560px){nav{display:none}.hero{padding:48px 0 40px}}
+
+/* Apparition au défilement */
+.js .reveal{opacity:0}
+.js .reveal.visible{opacity:1;animation:fadeUp .7s cubic-bezier(.2,.7,.2,1) var(--d,0s) backwards}
+.js .steps .reveal.visible{animation-name:slideIn}
+.steps .reveal.visible::before{animation:popIn .5s cubic-bezier(.3,1.6,.5,1) calc(var(--d,0s) + .25s) backwards}
+.grid > :nth-child(3n+2){--d:.1s}
+.grid > :nth-child(3n+3){--d:.2s}
+.steps > :nth-child(2),details:nth-of-type(2){--d:.12s}
+.steps > :nth-child(3),details:nth-of-type(3){--d:.24s}
+details:nth-of-type(4){--d:.36s}
+
+@property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes popIn{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(70px,40px) scale(1.15)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes ring{0%{transform:scale(.7);opacity:.55}100%{transform:scale(1.9);opacity:0}}
+@keyframes beam{0%{transform:translateY(0)}100%{transform:translateY(80px)}}
+@keyframes draw{from{stroke-dashoffset:32}to{stroke-dashoffset:0}}
+@keyframes gradmove{to{background-position:200% center}}
+@keyframes shine{0%{transform:translateX(-120%)}35%,100%{transform:translateX(120%)}}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+@keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-10deg) scale(1.1)}60%{transform:rotate(8deg) scale(1.1)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
+@keyframes spin-border{to{--angle:360deg}}
+
+@media (max-width:560px){nav{display:none}.hero{padding:44px 0 40px}.scan-demo{margin-top:32px}}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .js .reveal{opacity:1}
+}
 </style>
 </head>
 <body>
@@ -81,48 +185,75 @@ footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font
 </header>
 
 <main>
-  <div class="wrap hero">
-    <span class="badge">100 % gratuit · Open source</span>
-    <h1>Protégez votre ordinateur,<br>sans payer un centime.</h1>
-    <p class="lead">FreeAV analyse vos fichiers et détecte les virus grâce aux signatures ClamAV, mises à jour chaque jour. Pas de publicité, pas d'abonnement, pas de collecte de données.</p>
-    <div class="ctas">
-      <a class="btn btn-primary" href="#telecharger">Télécharger gratuitement</a>
-      <a class="btn btn-ghost" href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener">Voir le code source</a>
+  <div class="hero-bg">
+    <div class="wrap hero">
+      <div class="emblem" aria-hidden="true">
+        <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+        <svg viewBox="0 0 64 64" width="88" height="88">
+          <defs>
+            <clipPath id="shieldClip"><path d="M32 4 8 14v16c0 15 10.2 26.8 24 30 13.8-3.2 24-15 24-30V14z"/></clipPath>
+            <linearGradient id="beamGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+          </defs>
+          <path d="M32 4 8 14v16c0 15 10.2 26.8 24 30 13.8-3.2 24-15 24-30V14z" fill="var(--accent)"/>
+          <g clip-path="url(#shieldClip)"><rect class="beam" x="0" y="-16" width="64" height="16" fill="url(#beamGrad)"/></g>
+          <path class="check" d="m22 33 7 7 14-16" stroke="var(--on-accent)" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="badge">100 % gratuit · Open source</span>
+      <h1>Protégez votre ordinateur,<br><span class="grad">sans payer un centime.</span></h1>
+      <p class="lead">FreeAV analyse vos fichiers et détecte les virus grâce aux signatures ClamAV, mises à jour chaque jour. Pas de publicité, pas d'abonnement, pas de collecte de données.</p>
+      <div class="ctas">
+        <a class="btn btn-primary shine" href="#telecharger">Télécharger gratuitement</a>
+        <a class="btn btn-ghost" href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener">Voir le code source</a>
+      </div>
+      <p class="note">Version en développement. Windows, macOS et Linux.</p>
+      <div class="scan-demo" id="scanDemo" role="img" aria-label="Démonstration animée : FreeAV analyse des fichiers, trouve un fichier de test EICAR et le met en quarantaine.">
+        <div class="scan-top"><span class="dots"><i></i><i></i><i></i></span><span>FreeAV · Analyse rapide</span></div>
+        <div class="scan-body">
+          <div class="scan-row"><span class="scan-status" data-k="status">Analyse en cours…</span><span class="scan-pct" data-k="pct">0 %</span></div>
+          <div class="bar"><span data-k="bar"></span></div>
+          <div class="scan-file" data-k="file">C:\Users\Public\Documents\facture_2026.pdf</div>
+          <div class="scan-stats">
+            <div><b data-k="count">0</b><span>fichiers analysés</span></div>
+            <div><b class="threats" data-k="threats">0</b><span>menace détectée</span></div>
+          </div>
+          <div class="scan-alert"><span aria-hidden="true">⚠</span><span>eicar_test.com : Eicar-Test-Signature, mis en quarantaine</span></div>
+        </div>
+      </div>
     </div>
-    <p class="note">Version en développement. Windows, macOS et Linux.</p>
   </div>
 
   <section id="fonctionnalites">
     <div class="wrap">
-      <h2>Tout l'essentiel, rien de superflu</h2>
-      <p class="sub">Une protection simple et transparente, pensée pour tout le monde.</p>
+      <h2 class="reveal">Tout l'essentiel, rien de superflu</h2>
+      <p class="sub reveal">Une protection simple et transparente, pensée pour tout le monde.</p>
       <div class="grid">
-        <div class="card">
+        <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
           <h3>Analyse à la demande</h3>
           <p>Scannez un fichier, un dossier ou tout votre disque en un clic.</p>
         </div>
-        <div class="card">
+        <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></div>
           <h3>Signatures à jour</h3>
           <p>Base de signatures ClamAV mise à jour automatiquement chaque jour.</p>
         </div>
-        <div class="card">
+        <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
           <h3>Quarantaine</h3>
           <p>Les fichiers suspects sont isolés en sécurité, vous décidez quoi en faire.</p>
         </div>
-        <div class="card">
+        <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="M9.5 12.5 11 14l3.5-3.5"/></svg></div>
           <h3>Respect de la vie privée</h3>
           <p>Tout se passe sur votre ordinateur. Aucun fichier n'est envoyé ailleurs.</p>
         </div>
-        <div class="card">
+        <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div>
           <h3>Léger et rapide</h3>
           <p>Ne ralentit pas votre machine quand vous ne l'utilisez pas.</p>
         </div>
-        <div class="card">
+        <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><path d="m8 6-6 6 6 6"/><path d="m16 6 6 6-6 6"/></svg></div>
           <h3>Open source</h3>
           <p>Le code est public : chacun peut le vérifier et l'améliorer.</p>
@@ -133,35 +264,35 @@ footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font
 
   <section id="comment">
     <div class="wrap">
-      <h2>Comment ça marche</h2>
-      <p class="sub">Trois étapes, et vous êtes protégé.</p>
+      <h2 class="reveal">Comment ça marche</h2>
+      <p class="sub reveal">Trois étapes, et vous êtes protégé.</p>
       <ol class="steps">
-        <li><strong>Téléchargez et installez FreeAV.</strong><br><span style="color:var(--muted)">Gratuit, sans inscription.</span></li>
-        <li><strong>Lancez une analyse.</strong><br><span style="color:var(--muted)">Depuis l'interface graphique ou en ligne de commande (<code>python -m freeav scan</code>).</span></li>
-        <li><strong>Gérez les menaces détectées.</strong><br><span style="color:var(--muted)">Mettez-les en quarantaine ou supprimez-les en un clic.</span></li>
+        <li class="reveal"><strong>Téléchargez et installez FreeAV.</strong><br><span style="color:var(--muted)">Gratuit, sans inscription.</span></li>
+        <li class="reveal"><strong>Lancez une analyse.</strong><br><span style="color:var(--muted)">Depuis l'interface graphique ou en ligne de commande (<code>python -m freeav scan</code>).</span></li>
+        <li class="reveal"><strong>Gérez les menaces détectées.</strong><br><span style="color:var(--muted)">Mettez-les en quarantaine ou supprimez-les en un clic.</span></li>
       </ol>
     </div>
   </section>
 
   <section id="telecharger">
-    <div class="wrap">
+    <div class="wrap reveal">
       <div class="download">
         <h2>Télécharger FreeAV</h2>
         <p class="sub" style="margin-bottom:0">La première version est en cours de développement. Le code source est déjà disponible sur GitHub.</p>
         <div class="platforms"><span>Windows</span><span>macOS</span><span>Linux</span></div>
-        <a class="btn btn-primary" href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener">Accéder au téléchargement sur GitHub</a>
+        <a class="btn btn-primary" href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener"><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Accéder au téléchargement sur GitHub</a>
       </div>
     </div>
   </section>
 
   <section id="faq">
     <div class="wrap">
-      <h2>Questions fréquentes</h2>
-      <p class="sub">Ce qu'on nous demande le plus souvent.</p>
-      <details><summary>FreeAV est-il vraiment gratuit ?</summary><p>Oui. Pas de version premium, pas de publicité, pas d'abonnement caché.</p></details>
-      <details><summary>Comment FreeAV détecte-t-il les virus ?</summary><p>FreeAV compare vos fichiers à la base de signatures ClamAV, un moteur antivirus open source reconnu et mis à jour quotidiennement.</p></details>
-      <details><summary>FreeAV remplace-t-il Windows Defender ?</summary><p>FreeAV est un outil d'analyse complémentaire. Nous recommandons de garder la protection intégrée de votre système activée.</p></details>
-      <details><summary>Mes fichiers sont-ils envoyés sur Internet ?</summary><p>Non. L'analyse se fait entièrement en local. Seules les mises à jour de signatures sont téléchargées.</p></details>
+      <h2 class="reveal">Questions fréquentes</h2>
+      <p class="sub reveal">Ce qu'on nous demande le plus souvent.</p>
+      <details class="reveal"><summary>FreeAV est-il vraiment gratuit ?</summary><p>Oui. Pas de version premium, pas de publicité, pas d'abonnement caché.</p></details>
+      <details class="reveal"><summary>Comment FreeAV détecte-t-il les virus ?</summary><p>FreeAV compare vos fichiers à la base de signatures ClamAV, un moteur antivirus open source reconnu et mis à jour quotidiennement.</p></details>
+      <details class="reveal"><summary>FreeAV remplace-t-il Windows Defender ?</summary><p>FreeAV est un outil d'analyse complémentaire. Nous recommandons de garder la protection intégrée de votre système activée.</p></details>
+      <details class="reveal"><summary>Mes fichiers sont-ils envoyés sur Internet ?</summary><p>Non. L'analyse se fait entièrement en local. Seules les mises à jour de signatures sont téléchargées.</p></details>
     </div>
   </section>
 </main>
@@ -169,5 +300,86 @@ footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font
 <footer>
   <div class="wrap">FreeAV (nom de travail) · Projet open source · <a href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener">GitHub</a></div>
 </footer>
+
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Ombre sous l'en-tête quand on défile
+  var header = document.querySelector('header');
+  function onScroll(){ header.classList.toggle('scrolled', window.scrollY > 8); }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  // Apparition des blocs au défilement
+  var items = document.querySelectorAll('.reveal');
+  if (reduce || !('IntersectionObserver' in window)) {
+    items.forEach(function(el){ el.classList.add('visible'); });
+  } else {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+      });
+    }, {threshold:0.15, rootMargin:'0px 0px -40px 0px'});
+    items.forEach(function(el){ io.observe(el); });
+  }
+
+  // Démo d'analyse en boucle
+  var demo = document.getElementById('scanDemo');
+  if (!demo) return;
+  var el = {};
+  demo.querySelectorAll('[data-k]').forEach(function(n){ el[n.getAttribute('data-k')] = n; });
+  var files = [
+    'C:\\Users\\Public\\Documents\\facture_2026.pdf',
+    'C:\\Program Files\\Mozilla Firefox\\firefox.exe',
+    'C:\\Users\\Public\\Pictures\\vacances_042.jpg',
+    'C:\\Users\\Public\\Downloads\\setup_jeu.exe',
+    'C:\\Windows\\System32\\drivers\\etc\\hosts',
+    'C:\\Users\\Public\\Music\\playlist.m3u',
+    'C:\\Users\\Public\\Documents\\budget.xlsx',
+    'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe',
+    'C:\\Users\\Public\\Desktop\\notes.txt',
+    'C:\\Users\\Public\\Videos\\anniversaire.mp4'
+  ];
+  var THREAT = 'C:\\Users\\Public\\Downloads\\eicar_test.com';
+  var TOTAL = 1342, DURATION = 6500, HIT = 0.62;
+  var fmt = function(n){ return n.toLocaleString('fr-FR'); };
+
+  function render(p, found){
+    el.pct.textContent = Math.floor(p * 100) + ' %';
+    el.bar.style.transform = 'scaleX(' + p + ')';
+    el.count.textContent = fmt(Math.floor(p * TOTAL));
+    el.threats.textContent = found ? '1' : '0';
+  }
+  function finish(){
+    demo.classList.add('done');
+    el.status.textContent = 'Analyse terminée';
+    el.file.textContent = fmt(TOTAL) + ' fichiers analysés, 1 menace isolée';
+  }
+  function run(){
+    demo.classList.remove('done', 'alert');
+    el.status.textContent = 'Analyse en cours…';
+    var start = null, last = 0, i = 0, found = false;
+    function frame(t){
+      if (start === null) start = t;
+      var p = Math.min((t - start) / DURATION, 1);
+      if (!found && p >= HIT) {
+        found = true;
+        demo.classList.add('alert');
+        el.file.textContent = THREAT;
+      } else if (t - last > 110 && !(found && p < HIT + 0.1)) {
+        last = t;
+        el.file.textContent = files[i++ % files.length];
+      }
+      render(p, found);
+      if (p < 1) requestAnimationFrame(frame);
+      else { finish(); setTimeout(run, 3200); }
+    }
+    requestAnimationFrame(frame);
+  }
+  if (reduce) { render(1, true); demo.classList.add('alert'); finish(); }
+  else run();
+})();
+</script>
 </body>
 </html>
