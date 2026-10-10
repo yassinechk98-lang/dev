@@ -23,6 +23,35 @@ est optionnel (`pip install -r requirements-optional.txt`). Python 3.10 ou plus 
   plus etre executables, et peuvent etre restaures ou supprimes.
 - **Ligne de commande** et **interface graphique** (Tkinter).
 
+## Reparer mon PC
+
+`python -m freeav repair` (ou le bouton **Reparer mon PC...**) diagnostique les problemes courants,
+surtout ceux que laissent les malwares, **sans rien modifier** :
+
+| Domaine | Ce qui est verifie | Reparation proposee |
+|---|---|---|
+| Demarrage | cles Run/RunOnce, dossier Demarrage, Winlogon (Shell, Userinit) | retrait de l'entree, valeur Windows d'origine |
+| Taches planifiees | taches lancees depuis Temp/Telechargements ou avec une commande cachee | desactivation de la tache |
+| Reseau | fichier hosts (sites de securite bloques, banque redirigee), proxy Internet et WinHTTP | desactivation de la ligne, du proxy |
+| Navigateur | extensions, page d'accueil ou moteur de recherche imposes (Chrome, Edge) | retrait de l'obligation |
+| Protection | Microsoft Defender desactive ou dossiers exclus par une strategie | reactivation |
+| Nettoyage | fichiers temporaires de plus de 24 h, disque presque plein | suppression des fichiers temporaires |
+| Outils Windows | SFC, DISM, cache DNS | lancement de l'outil |
+
+Les programmes lances au demarrage sont aussi analyses avec les signatures de FreeAV.
+
+```bash
+python -m freeav repair                      # diagnostic
+python -m freeav repair --fix 3fa2c1d0       # reparer un probleme (identifiant affiche)
+python -m freeav repair --fix-dangers        # reparer tout ce qui est marque DANGER
+python -m freeav repair --undo               # annuler la derniere reparation
+```
+
+Chaque modification est sauvegardee dans `~/.freeav/repair-backups` et peut etre annulee, sauf le
+nettoyage des fichiers temporaires et les outils Windows (signales "definitif"). Sous Windows, un
+point de restauration systeme est cree avant de reparer si FreeAV est lance en administrateur,
+ce qui est necessaire pour les reglages communs a tout le PC (HKLM, hosts, Defender, SFC).
+
 ## Utilisation
 
 ```bash

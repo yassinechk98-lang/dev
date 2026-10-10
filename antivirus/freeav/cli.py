@@ -113,6 +113,83 @@ def cmd_quarantine(args) -> int:
     return 0
 
 
+def malware_checker(scanner: Scanner | None = None):
+    """Adapte le scanner pour le module de reparation : nom de la menace ou None.
+    Une base de signatures abimee ne doit pas empecher de reparer le PC."""
+    if scanner is None:
+        try:
+            scanner = Scanner(load_default())
+        except (OSError, ValueError) as exc:
+            print(f"Attention : signatures illisibles ({exc}), verification des programmes "
+                  "desactivee.", file=sys.stderr)
+            return lambda path: None
+
+    def is_malware(path: Path) -> str | None:
+        try:
+            detection = scanner.scan_file(path)
+        except Exception:
+            return None
+        return detection.threat if detection and not detection.suspect else None
+    return is_malware
+
+
+SEVERITY_LABELS = {"danger": "DANGER ", "suspect": "SUSPECT", "info": "INFO   ", "outil": "OUTIL  "}
+
+
+def cmd_repair(args) -> int:
+    from . import repair
+
+    if args.list_backups:
+        backups = repair.list_backups()
+        print("\n".join(str(b) for b in backups) or "Aucune reparation a annuler.")
+        return 0
+    if args.undo is not None:
+        try:
+            report = repair.undo(Path(args.undo) if args.undo else None)
+        except (OSError, ValueError) as exc:
+            print(f"Erreur : {exc}", file=sys.stderr)
+            return 2
+        for title, ok, message in report:
+            print(f"{'ANNULE ' if ok else 'ECHEC  '} {title} : {message}")
+        return 0 if all(ok for _, ok, _ in report) else 1
+
+    system = repair.System()
+    print("Diagnostic du PC en cours (aucune modification)...")
+    findings = repair.diagnose(system, malware_checker())
+    if not args.fix and not args.fix_dangers:
+        problems = [f for f in findings if f.severity != "outil"]
+        if not problems:
+            print("Aucun probleme detecte.")
+        for f in findings:
+            admin = " [admin]" if f.needs_admin else ""
+            fix = f"  -> reparer : freeav repair --fix {f.id}{admin}" if f.fixable else ""
+            print(f"{SEVERITY_LABELS.get(f.severity, f.severity)} [{f.category}] {f.title}\n"
+                  f"         {f.detail}{fix}")
+        if not system.is_admin and any(f.needs_admin for f in findings):
+            print("\nCertaines reparations demandent de lancer FreeAV en administrateur.")
+        return 1 if any(f.severity in ("danger", "suspect") for f in problems) else 0
+
+    wanted = set(args.fix or [])
+    chosen = [f for f in findings if f.id in wanted
+              or (args.fix_dangers and f.severity == "danger" and f.fixable)]
+    unknown = wanted - {f.id for f in chosen}
+    if unknown:
+        print(f"Erreur : probleme introuvable : {', '.join(sorted(unknown))} "
+              "(relancez 'freeav repair' pour voir la liste)", file=sys.stderr)
+        return 2
+    if not chosen:
+        print("Rien a reparer.")
+        return 0
+    if repair.create_restore_point(system):
+        print("Point de restauration Windows cree.")
+    results, journal = repair.apply_fixes(chosen, system)
+    for r in results:
+        print(f"{'REPARE ' if r.ok else 'ECHEC  '} {r.finding.title} : {r.message}")
+    if journal:
+        print(f"\nPour tout annuler : freeav repair --undo   (sauvegarde : {journal})")
+    return 0 if all(r.ok for r in results) else 1
+
+
 def cmd_update(args) -> int:
     try:
         if args.auth_key and args.save_key:
@@ -161,6 +238,15 @@ def main(argv: list[str] | None = None) -> int:
     upd.add_argument("--save-key", action="store_true",
                      help="memoriser la cle pour les prochaines mises a jour")
     upd.set_defaults(func=cmd_update)
+
+    rep = sub.add_parser("repair", help="diagnostiquer et reparer les problemes du PC")
+    rep.add_argument("--fix", nargs="+", metavar="ID", help="reparer ces problemes")
+    rep.add_argument("--fix-dangers", action="store_true",
+                     help="reparer tous les problemes marques DANGER")
+    rep.add_argument("--undo", nargs="?", const="", metavar="SAUVEGARDE",
+                     help="annuler la derniere reparation (ou celle indiquee)")
+    rep.add_argument("--list-backups", action="store_true", help="lister les sauvegardes")
+    rep.set_defaults(func=cmd_repair)
 
     gui = sub.add_parser("gui", help="ouvrir l'interface graphique")
     gui.set_defaults(func=lambda _args: __import__("freeav.gui", fromlist=["run"]).run())

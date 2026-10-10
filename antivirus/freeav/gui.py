@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from . import __version__, updater
 from .clamav import ClamdClient
-from .cli import build_yara, scan_exclusions
+from .cli import build_yara, malware_checker, scan_exclusions
 from .quarantine import Quarantine
 from .scanner import Scanner
 from .signatures import load_default
@@ -50,6 +50,8 @@ class App(tk.Tk):
         ttk.Checkbutton(actions, text="Utiliser ClamAV (clamd)",
                         variable=self.use_clamav).pack(side="left", padx=12)
         ttk.Button(actions, text="Quarantaine...", command=self._show_quarantine).pack(side="right")
+        ttk.Button(actions, text="Reparer mon PC...",
+                   command=lambda: RepairWindow(self)).pack(side="right", padx=6)
         self.update_btn = ttk.Button(actions, text="Mettre a jour les signatures",
                                      command=self._start_update)
         self.update_btn.pack(side="right", padx=6)
@@ -218,6 +220,125 @@ class App(tk.Tk):
         ttk.Button(buttons, text="Supprimer definitivement",
                    command=lambda: act(self.quarantine.delete)).pack(side="left", padx=6)
         refresh()
+
+
+SEVERITY_TEXT = {"danger": "Danger", "suspect": "Suspect", "info": "Info", "outil": "Outil"}
+
+
+class RepairWindow(tk.Toplevel):
+    """Diagnostic du PC, puis reparation des problemes choisis, avec annulation possible."""
+
+    def __init__(self, master):
+        super().__init__(master)
+        from . import repair
+        self.repair = repair
+        self.system = repair.System()
+        self.title("Reparer mon PC")
+        self.geometry("900x460")
+        self.events: queue.Queue = queue.Queue()
+        self.findings: dict = {}
+        self.status = tk.StringVar(value="Diagnostic en cours (rien n'est modifie)...")
+
+        cols = ("gravite", "categorie", "probleme", "detail")
+        self.tree = ttk.Treeview(self, columns=cols, show="headings", selectmode="extended")
+        for col, title, width in zip(cols, ("Gravite", "Categorie", "Probleme", "Detail"),
+                                     (80, 120, 260, 420)):
+            self.tree.heading(col, text=title)
+            self.tree.column(col, width=width, anchor="w")
+        self.tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+        bar = ttk.Frame(self, padding=(10, 0, 10, 10))
+        bar.pack(fill="x")
+        ttk.Label(bar, textvariable=self.status).pack(side="left")
+        self.fix_btn = ttk.Button(bar, text="Reparer la selection", command=self._fix_selected,
+                                  state="disabled")
+        self.fix_btn.pack(side="right")
+        ttk.Button(bar, text="Annuler la derniere reparation",
+                   command=self._undo).pack(side="right", padx=6)
+        ttk.Button(bar, text="Actualiser", command=self._diagnose).pack(side="right")
+        self._diagnose()
+        self.after(100, self._poll)
+
+    def _run(self, kind, fn):
+        def work():
+            try:
+                self.events.put((kind, fn()))
+            except Exception as exc:  # jamais de fenetre figee
+                self.events.put(("error", str(exc)))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _diagnose(self):
+        self.fix_btn.config(state="disabled")
+        self.status.set("Diagnostic en cours (rien n'est modifie)...")
+        self._run("diagnosed", lambda: self.repair.diagnose(self.system, malware_checker()))
+
+    def _poll(self):
+        if not self.winfo_exists():
+            return
+        try:
+            while True:
+                kind, payload = self.events.get_nowait()
+                if kind == "diagnosed":
+                    self._show(payload)
+                elif kind == "fixed":
+                    results, journal = payload
+                    lines = [f"{'OK' if r.ok else 'ECHEC'} - {r.finding.title} : {r.message}"
+                             for r in results]
+                    if journal:
+                        lines.append("\nVous pouvez tout annuler avec "
+                                     "« Annuler la derniere reparation ».")
+                    messagebox.showinfo("Reparer mon PC", "\n".join(lines), parent=self)
+                    self._diagnose()
+                elif kind == "undone":
+                    messagebox.showinfo("Reparer mon PC", "\n".join(
+                        f"{'OK' if ok else 'ECHEC'} - {t} : {m}" for t, ok, m in payload), parent=self)
+                    self._diagnose()
+                elif kind == "error":
+                    self.status.set(f"Erreur : {payload}")
+                    messagebox.showerror("Reparer mon PC", payload, parent=self)
+        except queue.Empty:
+            pass
+        self.after(100, self._poll)
+
+    def _show(self, findings):
+        self.tree.delete(*self.tree.get_children())
+        self.findings = {}
+        for f in findings:
+            title = f.title + (" (admin)" if f.needs_admin and not self.system.is_admin else "")
+            item = self.tree.insert("", "end", values=(SEVERITY_TEXT.get(f.severity, f.severity),
+                                                       f.category, title, f.detail))
+            self.findings[item] = f
+        problems = [f for f in findings if f.severity in ("danger", "suspect")]
+        self.status.set(f"{len(problems)} probleme(s) a examiner." if problems
+                        else "Aucun probleme important detecte.")
+        self.fix_btn.config(state="normal")
+
+    def _fix_selected(self):
+        chosen = [self.findings[i] for i in self.tree.selection() if self.findings[i].fixable]
+        if not chosen:
+            messagebox.showinfo("Reparer mon PC", "Selectionnez un ou plusieurs problemes "
+                                "reparables dans la liste.", parent=self)
+            return
+        text = "\n".join(f"- {f.title} : {f.fix_label}"
+                         + ("" if f.undoable else " (definitif)") for f in chosen)
+        if not messagebox.askyesno("Reparer mon PC", f"FreeAV va effectuer :\n{text}\n\n"
+                                   "Les modifications sont sauvegardees. Continuer ?", parent=self):
+            return
+        self.fix_btn.config(state="disabled")
+        self.status.set("Reparation en cours...")
+
+        def work():
+            self.repair.create_restore_point(self.system)
+            return self.repair.apply_fixes(chosen, self.system)
+        self._run("fixed", work)
+
+    def _undo(self):
+        if not self.repair.list_backups():
+            messagebox.showinfo("Reparer mon PC", "Aucune reparation a annuler.", parent=self)
+            return
+        if messagebox.askyesno("Reparer mon PC", "Annuler la derniere serie de reparations ?",
+                               parent=self):
+            self._run("undone", lambda: self.repair.undo(system=self.system))
 
 
 def run():

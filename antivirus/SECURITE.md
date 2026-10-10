@@ -30,6 +30,10 @@
 - **FreeAV n'analyse pas ses propres donnees** (`~/.freeav`, regles YARA), qui contiennent
   forcement des motifs de malwares.
 
+- **Reparer mon PC ne touche a rien sans votre accord** : le diagnostic est en lecture seule,
+  chaque reparation est choisie par vous, sauvegardee et annulable (sauf nettoyage et outils
+  Windows, annonces comme definitifs), et le nettoyage refuse tout dossier qui n'est pas temporaire.
+
 ## Securite du code (GitHub)
 
 - **CodeQL** analyse le code a chaque PR et chaque semaine (`.github/workflows/codeql.yml`).
