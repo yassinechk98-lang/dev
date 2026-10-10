@@ -1,0 +1,144 @@
+name: FreeAV pour Windows
+
+# Construit FreeAV.exe sur une vraie machine Windows, le verifie, puis le publie
+# dans la release "freeav-test" : le lien de telechargement direct ne change jamais.
+on:
+  push:
+    branches: [main, antivirus-prototype]
+    paths: ["antivirus/**", ".github/workflows/build-windows.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-windows
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: antivirus
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installe les outils
+        run: pip install -r requirements-dev.txt -r requirements-build.txt
+
+      - name: Lance les tests sous Windows
+        run: pytest -rA --junitxml=resultats-tests.xml --basetemp "$env:RUNNER_TEMP\freeav-tests"
+
+      - name: Signale les tests en echec
+        if: failure()
+        shell: python
+        run: |
+          import xml.etree.ElementTree as ET
+          for case in ET.parse("resultats-tests.xml").iter("testcase"):
+              for bad in list(case.findall("failure")) + list(case.findall("error")):
+                  text = (bad.get("message") or "") + " | " + (bad.text or "")[-1500:]
+                  text = text.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+                  print(f"::error title={case.get('name')}::{text}")
+
+      - name: Cree l'icone
+        run: python packaging/make_icon.py freeav/data/freeav.ico
+
+      - name: Construit FreeAV.exe
+        run: >
+          pyinstaller --noconfirm --onefile --windowed --name FreeAV
+          --icon freeav/data/freeav.ico --paths .
+          --add-data "freeav/data;freeav/data"
+          packaging/freeav_app.py
+
+      - name: Verifie FreeAV.exe (detection et fichier sain)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force essai | Out-Null
+          Set-Content -NoNewline essai/sain.txt "bonjour"
+          $echantillon = Join-Path (Resolve-Path essai) "echantillon.txt"
+          [IO.File]::WriteAllText($echantillon, "echantillon de test FreeAV $(Get-Random)")
+          if (-not (Test-Path $echantillon)) { Write-Host "::error title=FreeAV.exe::le fichier de test a ete supprime (antivirus du serveur ?)"; exit 1 }
+          $hash = (Get-FileHash $echantillon -Algorithm SHA256).Hash.ToLower()
+          Set-Content base.txt "sha256:${hash}:Test.FreeAV"
+          function Lance-FreeAV {
+            $p = Start-Process dist/FreeAV.exe -ArgumentList "scan", "essai", "--db", "base.txt" `
+              -Wait -PassThru -RedirectStandardOutput sortie.txt -RedirectStandardError erreurs.txt
+            Get-Content sortie.txt, erreurs.txt
+            Write-Host "code de sortie : $($p.ExitCode)"
+            return $p.ExitCode
+          }
+          function Echec($message) {
+            $sortie = ((Get-Content sortie.txt, erreurs.txt -Raw -ErrorAction SilentlyContinue) -join "`n") -replace "`r", "" -replace "`n", "%0A"
+            Write-Host "::error title=FreeAV.exe::$message%0A$sortie"
+            exit 1
+          }
+          $code = Lance-FreeAV
+          if ($code[-1] -ne 1) { Echec "detection attendue (code 1), obtenu $($code[-1])" }
+          Remove-Item $echantillon
+          $code = Lance-FreeAV
+          if ($code[-1] -ne 0) { Echec "aucune menace attendue (code 0), obtenu $($code[-1])" }
+          function Lance($arguments) {
+            $p = Start-Process dist/FreeAV.exe -ArgumentList $arguments -Wait -PassThru `
+              -RedirectStandardOutput sortie.txt -RedirectStandardError erreurs.txt
+            Get-Content sortie.txt, erreurs.txt | Write-Host
+            return $p.ExitCode
+          }
+          # Protection automatique : installation reelle, verification, puis retrait
+          if ((Lance @("schedule", "--at", "03:00")) -ne 0) { Echec "installation de la protection automatique" }
+          schtasks /query /tn "FreeAV\Analyse quotidienne" | Out-Null
+          if ($LASTEXITCODE -ne 0) { Echec "tache planifiee absente" }
+          $run = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run").FreeAV
+          if ($run -notlike "*\FreeAV\FreeAV.exe*watch --quarantine --notify") { Echec "entree de demarrage incorrecte : $run" }
+          if (-not (Test-Path "$env:LOCALAPPDATA\FreeAV\FreeAV.exe")) { Echec "FreeAV.exe non copie" }
+          if ((Lance @("schedule", "--remove")) -ne 0) { Echec "retrait de la protection automatique" }
+          schtasks /query /tn "FreeAV\Analyse quotidienne" 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) { Echec "tache planifiee toujours presente" }
+          if ((Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run").FreeAV) { Echec "entree de demarrage toujours presente" }
+          # Entretien automatique : doit s'executer jusqu'au bout et ecrire son journal
+          $code = Lance @("auto")
+          if ($code -gt 1) { Echec "entretien automatique, code $code" }
+          if (-not (Test-Path "$HOME\.freeav\logs\auto.log")) { Echec "journal de l'entretien absent" }
+          $global:LASTEXITCODE = 0
+          (Get-FileHash dist/FreeAV.exe -Algorithm SHA256).Hash.ToLower() + "  FreeAV.exe" | Set-Content dist/FreeAV.exe.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FreeAV-windows
+          path: |
+            antivirus/dist/FreeAV.exe
+            antivirus/dist/FreeAV.exe.sha256
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: FreeAV-windows
+
+      - name: Publie dans la release freeav-test
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete freeav-test --cleanup-tag --yes || true
+          URL="https://github.com/${GH_REPO}/releases/download/freeav-test/FreeAV.exe"
+          {
+            echo "Version de test construite automatiquement depuis la branche ${{ github.ref_name }} (commit ${{ github.sha }})."
+            echo
+            echo "Telechargement direct : ${URL}"
+            echo
+            echo "Le fichier n'est pas signe : Windows SmartScreen peut afficher « Windows a protege votre ordinateur »."
+            echo "Cliquez sur « Informations complementaires » puis « Executer quand meme »."
+            echo "Empreinte SHA-256 : $(cut -d' ' -f1 FreeAV.exe.sha256)"
+          } > notes.md
+          gh release create freeav-test FreeAV.exe FreeAV.exe.sha256 \
+            --prerelease --target "${{ github.sha }}" \
+            --title "FreeAV - version de test" --notes-file notes.md

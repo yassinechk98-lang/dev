@@ -1,0 +1,7 @@
+# Base de signatures FreeAV
+# Format : sha256:<empreinte>:<nom>  ou  md5:<empreinte>:<nom>
+# Les bases ClamAV (.hdb / .hsb) peuvent aussi etre chargees avec --db.
+
+# Fichier de test standard EICAR (inoffensif, reconnu par tous les antivirus)
+sha256:275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f:EICAR-Test-File
+md5:44d88612fea8a8f36de82e1278abb02f:EICAR-Test-File

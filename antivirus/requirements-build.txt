@@ -1,0 +1,3 @@
+# Outils pour construire FreeAV.exe (versions figees : un exe d'antivirus doit etre reproductible)
+pyinstaller==6.16.0
+pillow==11.3.0
