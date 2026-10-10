@@ -60,8 +60,10 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force essai | Out-Null
           Set-Content -NoNewline essai/sain.txt "bonjour"
-          Set-Content -NoNewline essai/faux_virus.bin "fichier de test FreeAV"
-          $hash = (Get-FileHash essai/faux_virus.bin -Algorithm SHA256).Hash.ToLower()
+          $echantillon = Join-Path (Resolve-Path essai) "echantillon.txt"
+          [IO.File]::WriteAllText($echantillon, "echantillon de test FreeAV $(Get-Random)")
+          if (-not (Test-Path $echantillon)) { Write-Host "::error title=FreeAV.exe::le fichier de test a ete supprime (antivirus du serveur ?)"; exit 1 }
+          $hash = (Get-FileHash $echantillon -Algorithm SHA256).Hash.ToLower()
           Set-Content base.txt "sha256:${hash}:Test.FreeAV"
           function Lance-FreeAV {
             $p = Start-Process dist/FreeAV.exe -ArgumentList "scan", "essai", "--db", "base.txt" `
@@ -77,7 +79,7 @@ jobs:
           }
           $code = Lance-FreeAV
           if ($code[-1] -ne 1) { Echec "detection attendue (code 1), obtenu $($code[-1])" }
-          Remove-Item essai/faux_virus.bin
+          Remove-Item $echantillon
           $code = Lance-FreeAV
           if ($code[-1] -ne 0) { Echec "aucune menace attendue (code 0), obtenu $($code[-1])" }
           (Get-FileHash dist/FreeAV.exe -Algorithm SHA256).Hash.ToLower() + "  FreeAV.exe" | Set-Content dist/FreeAV.exe.sha256
