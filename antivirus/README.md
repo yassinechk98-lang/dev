@@ -58,7 +58,8 @@ python -m freeav repair --undo               # annuler la derniere reparation
 ```
 
 Les modifications du registre, du fichier hosts, du dossier Demarrage et des taches planifiees sont
-sauvegardees dans `~/.freeav/repair-backups` et peuvent etre annulees.
+sauvegardees dans `~/.freeav/repair-backups` (dans `%ProgramData%\FreeAV`, reserve aux
+administrateurs, quand FreeAV est lance en administrateur) et peuvent etre annulees.
 
 **Attention : deux types d'actions sont definitifs et ne peuvent pas etre annules** : le nettoyage des
 fichiers temporaires (les fichiers sont supprimes) et les outils Windows SFC, DISM et vidage du cache

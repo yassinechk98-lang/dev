@@ -10,6 +10,7 @@ mises en quarantaine ; un resultat "suspect" (YARA) est signale, jamais deplace.
 
 import os
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -38,9 +39,10 @@ class WatchEvent:
     detection: Detection | None = None
 
 
-def _snapshot(folders: list[Path], exclude: set[Path]) -> dict[Path, tuple[int, int]]:
-    """{fichier: (taille, date de modification)} pour les fichiers ordinaires des dossiers."""
-    state: dict[Path, tuple[int, int]] = {}
+def _snapshot(folders: list[Path], exclude: set[Path]) -> dict[Path, tuple]:
+    """{fichier: (taille, date, identifiant, changement)} : un fichier remplace par un autre
+    de meme taille et meme date change quand meme d'identifiant."""
+    state: dict[Path, tuple] = {}
     stack = [(Path(f), 0) for f in folders]
     while stack and len(state) < MAX_FILES:
         folder, depth = stack.pop()
@@ -58,7 +60,7 @@ def _snapshot(folders: list[Path], exclude: set[Path]) -> dict[Path, tuple[int, 
                         stack.append((path, depth + 1))
                 elif entry.is_file(follow_symlinks=False):
                     st = entry.stat(follow_symlinks=False)
-                    state[path] = (st.st_size, st.st_mtime_ns)
+                    state[path] = (st.st_size, st.st_mtime_ns, st.st_ino, st.st_ctime_ns)
             except OSError:
                 continue
     return state
@@ -76,7 +78,7 @@ class FolderWatcher:
             self.exclude.add(Path(quarantine.directory))
         self.on_event = on_event or (lambda event: None)
         self._known = _snapshot(self.folders, self.exclude)  # deja presents : pas re-analyses
-        self._pending: dict[Path, tuple[int, int]] = {}
+        self._pending: dict[Path, tuple] = {}
         self.scanned = 0
 
     def poll(self) -> list[WatchEvent]:
@@ -129,8 +131,18 @@ class FolderWatcher:
         return WatchEvent("quarantaine", path,
                           f"menace bloquee : {detection.threat}, fichier mis en quarantaine", detection)
 
-    def run(self, stop: threading.Event, interval: float = 2.0) -> None:
+    def run(self, stop: threading.Event, interval: float = 2.0,
+            stop_file: Path | None = None) -> None:
+        """Surveille jusqu'a stop, ou jusqu'a ce que stop_file soit cree apres le demarrage
+        (c'est ainsi que "Tout retirer" arrete la protection lancee a l'ouverture de session)."""
+        started = time.time()
         while not stop.wait(interval):
+            if stop_file is not None:
+                try:
+                    if stop_file.stat().st_mtime >= started:
+                        return
+                except OSError:
+                    pass
             self.poll()
 
 

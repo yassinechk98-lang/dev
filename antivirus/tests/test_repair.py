@@ -1,6 +1,8 @@
 """Tests du module "Reparer mon PC", avec un faux Windows (registre et commandes simules)."""
 
 import subprocess
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -40,6 +42,10 @@ class FakeRunner:
 
     def __call__(self, args, timeout):
         self.calls.append(args)
+        if "CommonApplicationData" in args[-1]:  # dossier de sauvegarde administrateur
+            if not hasattr(self, "programdata"):
+                self.programdata = Path(tempfile.mkdtemp()) / "ProgramData" / "FreeAV"
+            return subprocess.CompletedProcess(args, 0, f"OK {self.programdata}\n", "")
         out, code = self.outputs.get(args[0].lower(), ("", 0))
         return subprocess.CompletedProcess(args, code, out, "")
 
@@ -287,3 +293,158 @@ def test_missing_program_in_temp_folder_is_still_suspect(tmp_path):
                     is_windows=True, is_admin=True, home=tmp_path, environ={})
     verdict = checks._judge_command(f'"{gone}"'.replace("/", "\\"), system, is_malware)
     assert verdict[0] == SUSPECT
+
+
+def _forged_journal(backups, steps):
+    import json
+    backups.mkdir(parents=True, exist_ok=True)
+    journal = backups / "20990101-000000-dead.json"
+    journal.write_text(json.dumps({"date": 0, "steps": steps}), encoding="utf-8")
+    return journal
+
+
+@pytest.mark.parametrize("action", [
+    {"type": "command", "args": ["cmd", "/c", "net", "user", "pirate", "/add"]},
+    {"type": "clean_temp", "dir": "C:\\Temp"},
+    {"type": "reg_set", "hive": "HKLM", "key": r"SYSTEM\CurrentControlSet\Services\Mal",
+     "name": "ImagePath", "value": "C:\\mal.exe", "kind": REG_SZ},
+    {"type": "reg_set", "hive": "HKLM", "key": checks.WINLOGON + "Evil", "name": "Shell",
+     "value": "mal.exe", "kind": REG_SZ},
+    {"type": "file_restore", "from": "C:\\Users\\bob\\Downloads\\mal.dll",
+     "to": "C:\\Windows\\System32\\mal.dll"},
+])
+def test_forged_undo_journal_is_refused_without_running_anything(pc, tmp_path, action):
+    """Un programme qui ecrit un faux journal ne doit rien pouvoir faire executer a FreeAV."""
+    system, _ = pc
+    backups = tmp_path / "b"
+    legit = {"type": "reg_delete", "hive": "HKCU", "key": RUN, "name": "Updater"}
+    journal = _forged_journal(backups, [{"title": "ok", "action": legit},
+                                        {"title": "piege", "action": action}])
+    registry_before = {k: dict(v) for k, v in system.registry.data.items()}
+    calls_before = len(system.runner.calls)
+    with pytest.raises(repair.UnsafeBackupError):
+        repair.undo(journal, system, backup_root=backups)
+    assert system.registry.data == registry_before  # tout ou rien : meme l'etape valide n'est pas jouee
+    assert len(system.runner.calls) == calls_before
+    with pytest.raises(repair.UnsafeBackupError):
+        repair.undo(None, system, backup_root=backups)  # "Annuler la derniere reparation"
+
+
+def test_journal_outside_the_backup_folder_is_refused(pc, tmp_path):
+    system, _ = pc
+    journal = _forged_journal(tmp_path / "ailleurs", [])
+    with pytest.raises(repair.UnsafeBackupError):
+        repair.undo(journal, system, backup_root=tmp_path / "b")
+
+
+def test_admin_backups_go_to_the_protected_folder(pc, tmp_path):
+    system, _ = pc  # faux Windows lance en administrateur
+    assert system.is_admin and system.is_windows
+    entry = by_title(repair.diagnose(system, is_malware))["Programme au demarrage : Updater"]
+    results, journal = repair.apply_fixes([entry], system)
+    assert results[0].ok
+    assert journal.parent == system.runner.programdata / "repair-backups"
+    assert repair.list_backups(system=system) == [journal]
+    assert all(ok for _, ok, _ in repair.undo(system=system))
+
+
+def test_admin_repairs_stop_if_the_protected_folder_is_not_safe(pc):
+    system, _ = pc
+    system.runner = lambda args, timeout: subprocess.CompletedProcess(
+        args, 3, "ERREUR proprietaire\n", "") if "CommonApplicationData" in args[-1] \
+        else subprocess.CompletedProcess(args, 0, "", "")
+    entry = by_title(repair.diagnose(system, is_malware))["Programme au demarrage : Updater"]
+    with pytest.raises(repair.UnsafeBackupError):
+        repair.apply_fixes([entry], system)
+    assert system.registry.get("HKCU", RUN, "Updater") is not None  # rien n'a ete modifie
+
+
+def _old(path, data=b"x"):
+    import os
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    os.utime(path, (0, 0))
+    return path
+
+
+def _clean(temp):
+    finding = checks.Finding(key="t", category="Nettoyage", title="t", detail="", severity=INFO,
+                             action={"type": "clean_temp", "dir": str(temp)}, undoable=False)
+    return repair.apply_fixes([finding], System(is_windows=False, is_admin=False),
+                              backup_root=temp.parent / "b")
+
+
+def test_temp_cleanup_never_follows_a_symlink_out_of_temp(tmp_path):
+    temp = tmp_path / "Temp"
+    precious = _old(tmp_path / "Documents" / "these.docx")
+    junk = _old(temp / "vieux.tmp")
+    try:
+        (temp / "lien").symlink_to(precious.parent, target_is_directory=True)
+        (temp / "fichier-lien.tmp").symlink_to(precious)
+    except OSError:
+        pytest.skip("liens symboliques non autorises sur ce systeme")
+    assert checks.old_temp_files(temp) == [junk]
+    results, _ = _clean(temp)
+    assert results[0].ok and precious.exists() and not junk.exists()
+
+
+@pytest.mark.skipif(not __import__("sys").platform.startswith("win"), reason="jonctions Windows")
+def test_temp_cleanup_never_follows_a_windows_junction(tmp_path):
+    temp = tmp_path / "Temp"
+    precious = _old(tmp_path / "Documents" / "these.docx")
+    junk = _old(temp / "vieux.tmp")
+    subprocess.run(["cmd", "/c", "mklink", "/J", str(temp / "jonction"), str(precious.parent)],
+                   check=True, capture_output=True)
+    assert (temp / "jonction" / "these.docx").exists()  # la jonction fonctionne bien
+    naive = [p for p in temp.rglob("*") if p.name == "these.docx"]
+    print(f"Path.rglob suit la jonction : {bool(naive)}")  # ancien comportement, pour le rapport
+    assert checks.old_temp_files(temp) == [junk]
+    results, _ = _clean(temp)
+    assert results[0].ok and precious.exists() and not junk.exists()
+
+
+def test_elevated_quarantine_restores_only_into_the_home_folder(tmp_path):
+    import json
+    from freeav.quarantine import Quarantine
+    q = Quarantine(tmp_path / "q", elevated=True)
+    sample = Path.home() / f".freeav-test-{tmp_path.name}.bin"
+    sample.write_bytes(b"donnees")
+    item = q.isolate(sample, "Test")
+    meta = tmp_path / "q" / f"{item}.json"
+    data = json.loads(meta.read_text(encoding="utf-8"))
+    data["original_path"] = str(tmp_path.anchor + "freeav-hors-profil.dll")
+    meta.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(PermissionError):
+        q.restore(item)
+    data["original_path"] = str(sample)
+    meta.write_text(json.dumps(data), encoding="utf-8")
+    assert q.restore(item) == sample
+    sample.unlink()
+
+
+@pytest.mark.skipif(not __import__("sys").platform.startswith("win"), reason="vrai Windows")
+def test_real_windows_protected_backup_folder():
+    """Sur un vrai Windows en administrateur : dossier verrouille, et un dossier depose par
+    quelqu'un d'autre (avec un faux journal) est mis de cote au lieu d'etre utilise."""
+    system = System()
+    if not system.is_admin:
+        pytest.skip("necessite les droits administrateur")
+    root = repair.admin_backup_root(system)
+    folder = root.parent
+    assert folder.is_dir()
+    acl = subprocess.run(["powershell", "-NoProfile", "-Command",
+                          f"(Get-Acl -LiteralPath '{folder}').Access | ForEach-Object "
+                          "{ $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value }"],
+                         capture_output=True, text=True, check=True).stdout.split()
+    assert set(acl) <= {"S-1-5-32-544", "S-1-5-18"}, acl
+
+    root.mkdir(exist_ok=True)
+    (root / "20990101-000000-dead.json").write_text('{"steps": []}', encoding="utf-8")
+    subprocess.run(["powershell", "-NoProfile", "-Command",
+                    f"$a = Get-Acl -LiteralPath '{folder}'; "
+                    "$a.SetOwner([Security.Principal.WindowsIdentity]::GetCurrent().User); "
+                    f"Set-Acl -LiteralPath '{folder}' -AclObject $a"], check=True)
+    root2 = repair.admin_backup_root(system)
+    assert root2 == root
+    assert not (root / "20990101-000000-dead.json").exists()
+    assert list(folder.parent.glob("FreeAV.non-sur-*"))

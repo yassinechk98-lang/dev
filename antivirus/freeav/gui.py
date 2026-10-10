@@ -404,7 +404,12 @@ class RepairWindow(tk.Toplevel):
         self._run("fixed", work)
 
     def _undo(self):
-        if not self.repair.list_backups():
+        try:
+            backups = self.repair.list_backups(system=self.system)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Reparer mon PC", str(exc), parent=self)
+            return
+        if not backups:
             messagebox.showinfo("Reparer mon PC", "Aucune reparation a annuler.", parent=self)
             return
         if messagebox.askyesno("Reparer mon PC", "Annuler la derniere serie de reparations ?",

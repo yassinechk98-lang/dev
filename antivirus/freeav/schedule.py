@@ -10,12 +10,17 @@ FreeAV se copie d'abord dans %LOCALAPPDATA%\\FreeAV. Tout s'enleve avec
 `freeav schedule --remove`.
 """
 
+import shlex
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
+from .paths import APP_DIR
 from .repair.platform import RegistryError, System
+
+STOP_FILE = APP_DIR / "watch.stop"  # demande d'arret a la protection deja lancee
 
 SCAN_TASK = r"FreeAV\Analyse quotidienne"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -57,7 +62,9 @@ def program_command(system: System) -> list[str]:
 def _check_windows(system: System) -> None:
     if not system.is_windows:
         raise ScheduleError("la protection automatique s'installe sous Windows. Sous Linux, "
-                            "ajoutez a votre crontab : 0 12 * * * python3 -m freeav auto")
+                            "ajoutez a votre crontab (crontab -e) : "
+                            f"0 12 * * * cd {shlex.quote(str(Path(__file__).resolve().parent.parent))} && "
+                            "python3 -m freeav auto")
 
 
 def _check_time(at: str) -> str:
@@ -97,6 +104,23 @@ def remove(system: System) -> list[str]:
     if system.registry.get("HKCU", RUN_KEY, RUN_VALUE):
         system.registry.delete("HKCU", RUN_KEY, RUN_VALUE)
         done.append("protection en temps reel retiree du demarrage")
+    STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
+    STOP_FILE.write_text(str(time.time()), encoding="utf-8")  # arrete la surveillance en cours
+    copy = install_dir(system) / "FreeAV.exe"
+    if copy.exists():
+        for _ in range(10):  # la surveillance s'arrete en moins de 3 secondes
+            try:
+                copy.unlink()
+                done.append(f"copie de FreeAV supprimee ({copy})")
+                break
+            except PermissionError:
+                time.sleep(0.5)
+        else:
+            done.append(f"copie de FreeAV encore utilisee, a supprimer a la main : {copy}")
+        try:
+            copy.parent.rmdir()
+        except OSError:
+            pass
     return done
 
 

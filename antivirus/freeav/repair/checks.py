@@ -9,6 +9,7 @@ import ipaddress
 import json
 import re
 import shutil
+import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -371,16 +372,55 @@ TEMP_MIN_AGE = 24 * 3600
 TEMP_REPORT_SIZE = 100 * 1024 * 1024
 
 
+def within(path: Path, directory: Path) -> bool:
+    """Vrai si le chemin reel de path (liens et jonctions resolus) reste dans directory."""
+    try:
+        real = Path(os.path.realpath(path))
+        base = Path(os.path.realpath(directory))
+    except (OSError, ValueError):
+        return False
+    return real == base or base in real.parents
+
+
+def _is_link(entry: os.DirEntry) -> bool:
+    """Lien symbolique, jonction Windows ou autre point de montage : on n'y entre jamais."""
+    if entry.is_symlink():
+        return True
+    is_junction = getattr(entry, "is_junction", None)  # Python 3.12+
+    if is_junction and is_junction():
+        return True
+    try:
+        attrs = getattr(entry.stat(follow_symlinks=False), "st_file_attributes", 0)
+    except OSError:
+        return True
+    return bool(attrs & 0x400)  # FILE_ATTRIBUTE_REPARSE_POINT
+
+
 def old_temp_files(directory: Path, now: float | None = None) -> list[Path]:
+    """Fichiers de plus de 24 h du dossier temporaire, sans jamais suivre un lien ou une
+    jonction vers un autre dossier (sinon un programme pourrait faire supprimer ailleurs)."""
     now = now or time.time()
-    files = []
-    for path in directory.rglob("*"):
+    directory = Path(directory)
+    files, stack = [], [directory]
+    while stack:
+        folder = stack.pop()
         try:
-            st = path.lstat()
+            entries = list(os.scandir(folder))
         except OSError:
             continue
-        if path.is_file() and not path.is_symlink() and now - st.st_mtime > TEMP_MIN_AGE:
-            files.append(path)
+        for entry in entries:
+            try:
+                if _is_link(entry):
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    stack.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False):
+                    st = entry.stat(follow_symlinks=False)
+                    path = Path(entry.path)
+                    if now - st.st_mtime > TEMP_MIN_AGE and within(path, directory):
+                        files.append(path)
+            except OSError:
+                continue
     return files
 
 

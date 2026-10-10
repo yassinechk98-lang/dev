@@ -32,8 +32,24 @@ def _open_private(path: Path, flags: int):
     return os.fdopen(os.open(path, flags, 0o600), "wb")
 
 
+def _inside(path: Path, directory: Path) -> bool:
+    real, base = Path(os.path.realpath(path)), Path(os.path.realpath(directory))
+    return real == base or base in real.parents
+
+
+def _is_elevated() -> bool:
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except (AttributeError, OSError):
+        return False
+
+
 class Quarantine:
-    def __init__(self, directory: Path = DEFAULT_DIR):
+    def __init__(self, directory: Path = DEFAULT_DIR, elevated: bool | None = None):
+        self.elevated = _is_elevated() if elevated is None else elevated
         self.directory = Path(directory)
 
     def isolate(self, path: Path, threat: str, expected_sha256: str = "") -> str:
@@ -93,6 +109,12 @@ class Quarantine:
             raise OSError(f"Emplacement d'origine invalide : {target}")
         if target.exists() or target.is_symlink():
             raise FileExistsError(f"{target} existe deja, restauration annulee")
+        if self.elevated and not _inside(target, Path.home()):
+            # La quarantaine est modifiable sans droits : en administrateur, une fausse fiche
+            # pourrait faire ecrire un fichier dans C:\Windows. On ne restaure alors que dans
+            # le dossier personnel.
+            raise PermissionError(f"FreeAV est lance en administrateur : restaurez {target} "
+                                  "en le relancant sans droits administrateur")
         target.parent.mkdir(parents=True, exist_ok=True)
         with open(blob, "rb") as src, _open_private(target, 0) as dst:
             while chunk := src.read(CHUNK):

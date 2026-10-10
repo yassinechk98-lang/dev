@@ -29,7 +29,7 @@ jobs:
           python-version: "3.12"
 
       - name: Installe les outils
-        run: pip install -r requirements-dev.txt pyinstaller pillow
+        run: pip install -r requirements-dev.txt -r requirements-build.txt
 
       - name: Lance les tests sous Windows
         run: pytest -rA --junitxml=resultats-tests.xml --basetemp "$env:RUNNER_TEMP\freeav-tests"

@@ -39,10 +39,21 @@
 - **Reparer mon PC ne touche a rien sans votre accord** : le diagnostic est en lecture seule,
   chaque reparation est choisie par vous, sauvegardee et annulable (sauf nettoyage et outils
   Windows, annonces comme definitifs), et le nettoyage refuse tout dossier qui n'est pas temporaire.
+- **Un faux journal ne peut rien faire executer** : "Annuler" ne rejoue que les actions inverses
+  prevues (registre, fichier sauvegarde, ligne du fichier hosts, tache), jamais une commande, et
+  seulement sur les cles de registre que FreeAV repare. Un journal douteux est refuse en entier.
+  En administrateur, les sauvegardes vont dans `%ProgramData%\FreeAV`, verrouille pour les seuls
+  administrateurs ; un dossier de ce nom cree par quelqu'un d'autre est mis de cote.
+- **Le nettoyage ne sort jamais du dossier temporaire** : il n'entre ni dans un lien symbolique ni
+  dans une jonction Windows, et verifie le chemin reel de chaque fichier juste avant de le supprimer
+  (teste avec une vraie jonction sur Windows).
+- **En administrateur, la quarantaine ne restaure que dans votre dossier personnel** : elle est
+  modifiable sans droits, une fausse fiche ne doit pas pouvoir ecrire dans `C:\Windows`.
 
 ## Securite du code (GitHub)
 
 - **CodeQL** analyse le code a chaque PR et chaque semaine (`.github/workflows/codeql.yml`).
+- **Outils de construction figes** (`requirements-build.txt`) pour FreeAV.exe.
 - **Dependabot** propose les mises a jour de securite des dependances et des actions GitHub.
 - Les workflows n'ont que les droits en lecture dont ils ont besoin.
 

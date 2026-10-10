@@ -143,7 +143,11 @@ def cmd_repair(args) -> int:
     from . import repair
 
     if args.list_backups:
-        backups = repair.list_backups()
+        try:
+            backups = repair.list_backups()
+        except (OSError, ValueError) as exc:
+            print(f"Erreur : {exc}", file=sys.stderr)
+            return 2
         print("\n".join(str(b) for b in backups) or "Aucune reparation a annuler.")
         return 0
     if args.undo is not None:
@@ -191,7 +195,11 @@ def cmd_repair(args) -> int:
         return 2
     if repair.create_restore_point(system):
         print("Point de restauration Windows cree.")
-    results, journal = repair.apply_fixes(chosen, system)
+    try:
+        results, journal = repair.apply_fixes(chosen, system)
+    except (OSError, ValueError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 2
     for r in results:
         print(f"{'REPARE ' if r.ok else 'ECHEC  '} {r.finding.title} : {r.message}")
     if journal:
@@ -239,7 +247,8 @@ def cmd_watch(args) -> int:
           "(Ctrl+C pour arreter)", flush=True)
     stop = threading.Event()
     try:
-        watch.run(stop, interval=args.interval)
+        from .schedule import STOP_FILE
+        watch.run(stop, interval=args.interval, stop_file=STOP_FILE)
     except KeyboardInterrupt:
         stop.set()
     print(f"Arret de la protection ({watch.scanned} nouveaux fichiers analyses).")

@@ -6,7 +6,12 @@ Principes de securite :
   - chaque modification est sauvegardee dans ~/.freeav/repair-backups et peut etre
     annulee (sauf nettoyage des fichiers temporaires et outils Windows, signales comme tels) ;
   - sous Windows, un point de restauration systeme est cree avant les reparations
-    quand FreeAV a les droits administrateur.
+    quand FreeAV a les droits administrateur ;
+  - l'annulation ne rejoue que des actions inverses prevues (jamais une commande), sur
+    les seules cles de registre que FreeAV repare, depuis son propre dossier de sauvegarde ;
+  - en administrateur, les sauvegardes vont dans %ProgramData%\\FreeAV, que seuls les
+    administrateurs peuvent modifier : un programme sans droits ne peut pas y deposer un
+    faux journal pour obtenir les droits administrateur au prochain "Annuler".
 """
 
 import base64
@@ -18,13 +23,106 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..paths import APP_DIR, ensure_private_dir
-from .checks import ALL_CHECKS, SEVERITY_ORDER, Finding, MalwareCheck, old_temp_files
+from . import checks
+from .checks import ALL_CHECKS, SEVERITY_ORDER, Finding, MalwareCheck, old_temp_files, \
+    within
 from .platform import RegistryError, System
 
 BACKUP_DIR = APP_DIR / "repair-backups"
 HOSTS_MARK = "# FreeAV a desactive : "
 
 __all__ = ["Finding", "System", "diagnose", "apply_fixes", "undo", "list_backups", "FixResult"]
+
+UNDO_ACTIONS = {"reg_set", "reg_delete", "file_restore", "hosts_uncomment", "task_enable"}
+REPAIRED_KEYS = (
+    [(hive, key) for hive, key in checks.RUN_KEYS]
+    + [(hive, checks.WINLOGON) for hive in ("HKLM", "HKCU")]
+    + [("HKCU", checks.INTERNET_SETTINGS)]
+    + [(hive, key) for _, key in checks.BROWSER_POLICIES for hive in ("HKLM", "HKCU")]
+    + [("HKLM", checks.DEFENDER)]
+)
+
+
+class UnsafeBackupError(ValueError):
+    """Journal d'annulation ou dossier de sauvegarde auquel FreeAV ne doit pas faire confiance."""
+
+
+def _repaired_key(hive: str, key: str) -> bool:
+    key = key.lower().rstrip("\\")
+    return any(hive == h and (key == k.lower() or key.startswith(k.lower() + "\\"))
+               for h, k in REPAIRED_KEYS)
+
+
+def check_undo_step(action: dict, backup_dir: Path) -> None:
+    """Refuse toute etape d'annulation que FreeAV n'aurait pas pu ecrire lui-meme."""
+    kind = action.get("type") if isinstance(action, dict) else None
+    if kind not in UNDO_ACTIONS:
+        raise UnsafeBackupError(f"action d'annulation refusee : {kind!r}")
+    if kind in ("reg_set", "reg_delete"):
+        if not (isinstance(action.get("hive"), str) and isinstance(action.get("key"), str)
+                and _repaired_key(action["hive"], action["key"])):
+            raise UnsafeBackupError(f"cle de registre hors du perimetre de FreeAV : "
+                                    f"{action.get('hive')}\\{action.get('key')}")
+    if kind == "file_restore":
+        source = Path(str(action.get("from", "")))
+        target = Path(str(action.get("to", "")))
+        if not (source.is_absolute() and target.is_absolute()
+                and within(source, backup_dir) and source.parent == backup_dir
+                and source.name.endswith("_" + target.name)):
+            raise UnsafeBackupError("restauration de fichier refusee : elle ne vient pas de la "
+                                    "sauvegarde de cette reparation")
+
+
+PROGRAMDATA_SCRIPT = r"""
+$ErrorActionPreference = 'Stop'
+$root = [Environment]::GetFolderPath('CommonApplicationData')
+$p = Join-Path $root 'FreeAV'
+$trusted = 'S-1-5-32-544', 'S-1-5-18'
+$sid = [Security.Principal.SecurityIdentifier]
+if (Test-Path -LiteralPath $p) {
+  $item = Get-Item -LiteralPath $p -Force
+  $owner = (Get-Acl -LiteralPath $p).GetOwner($sid).Value
+  if (($trusted -notcontains $owner) -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    # Dossier cree par quelqu'un d'autre : on le met de cote sans rien lire ni suivre dedans.
+    Rename-Item -LiteralPath $p -NewName ('FreeAV.non-sur-' + (Get-Date -Format 'yyyyMMddHHmmss'))
+  }
+}
+if (-not (Test-Path -LiteralPath $p)) { New-Item -ItemType Directory -Path $p | Out-Null }
+$acl = New-Object Security.AccessControl.DirectorySecurity
+$acl.SetOwner([Security.Principal.SecurityIdentifier]'S-1-5-32-544')
+$acl.SetAccessRuleProtection($true, $false)
+foreach ($t in $trusted) {
+  $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+    [Security.Principal.SecurityIdentifier]$t, 'FullControl', 'ContainerInherit,ObjectInherit',
+    'None', 'Allow')))
+}
+Set-Acl -LiteralPath $p -AclObject $acl
+$check = Get-Acl -LiteralPath $p
+if ($trusted -notcontains $check.GetOwner($sid).Value) { Write-Output 'ERREUR proprietaire'; exit 3 }
+foreach ($rule in $check.GetAccessRules($true, $true, $sid)) {
+  if ($rule.AccessControlType -eq 'Allow' -and $trusted -notcontains $rule.IdentityReference.Value) {
+    Write-Output ('ERREUR acces ' + $rule.IdentityReference.Value); exit 4
+  }
+}
+Write-Output ('OK ' + $p)
+"""
+
+
+def admin_backup_root(system: System) -> Path:
+    """%ProgramData%\\FreeAV\\repair-backups, verrouille pour les seuls administrateurs."""
+    result = system.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy",
+                         "Bypass", "-Command", PROGRAMDATA_SCRIPT], timeout=60)
+    lines = (result.stdout or "").strip().splitlines()
+    if result.returncode != 0 or not lines or not lines[-1].startswith("OK "):
+        raise UnsafeBackupError("impossible de proteger le dossier de sauvegarde "
+                                f"administrateur : {(result.stdout or result.stderr).strip()}")
+    return Path(lines[-1][3:].strip()) / "repair-backups"
+
+
+def backup_root_for(system: System) -> Path:
+    if system.is_windows and system.is_admin:
+        return admin_backup_root(system)
+    return BACKUP_DIR
 
 
 @dataclass
@@ -117,7 +215,9 @@ def _apply(action: dict, system: System, backup_dir: Path) -> tuple[str, dict | 
         removed = freed = 0
         for path in old_temp_files(directory):
             try:
-                size = path.stat().st_size
+                if not within(path, directory):  # re-verifie juste avant de supprimer
+                    continue
+                size = path.lstat().st_size
                 path.unlink()
                 removed, freed = removed + 1, freed + size
             except OSError:
@@ -145,9 +245,10 @@ def create_restore_point(system: System) -> bool:
 
 
 def apply_fixes(findings: list[Finding], system: System | None = None,
-                backup_root: Path = BACKUP_DIR) -> tuple[list[FixResult], Path | None]:
+                backup_root: Path | None = None) -> tuple[list[FixResult], Path | None]:
     """Repare les problemes choisis. Retourne les resultats et le fichier de sauvegarde."""
     system = system or System()
+    backup_root = Path(backup_root) if backup_root else backup_root_for(system)
     stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{uuid.uuid4().hex[:4]}"
     backup_dir = backup_root / stamp
     results, undo_steps = [], []
@@ -177,24 +278,45 @@ def apply_fixes(findings: list[Finding], system: System | None = None,
     return results, journal
 
 
-def list_backups(backup_root: Path = BACKUP_DIR) -> list[Path]:
+def list_backups(backup_root: Path | None = None, system: System | None = None) -> list[Path]:
+    if backup_root is None:
+        backup_root = backup_root_for(system or System())
     return sorted(Path(backup_root).glob("*.json")) if Path(backup_root).is_dir() else []
 
 
 def undo(journal: Path | None = None, system: System | None = None,
-         backup_root: Path = BACKUP_DIR) -> list[tuple[str, bool, str]]:
-    """Annule une serie de reparations (la derniere par defaut), dans l'ordre inverse."""
+         backup_root: Path | None = None) -> list[tuple[str, bool, str]]:
+    """Annule une serie de reparations (la derniere par defaut), dans l'ordre inverse.
+    Seuls les journaux du dossier de sauvegarde de FreeAV sont acceptes, et chaque etape
+    est verifiee avant d'etre rejouee."""
     system = system or System()
+    backup_root = Path(backup_root) if backup_root else backup_root_for(system)
     if journal is None:
         backups = list_backups(backup_root)
         if not backups:
-            raise FileNotFoundError("aucune reparation a annuler")
+            raise FileNotFoundError("aucune reparation a annuler"
+                                    + (" (celles faites sans droits administrateur s'annulent "
+                                       "sans ces droits)" if system.is_admin and system.is_windows
+                                       else ""))
         journal = backups[-1]
-    data = json.loads(Path(journal).read_text(encoding="utf-8"))
+    journal = Path(journal)
+    if journal.suffix != ".json" or journal.parent.resolve() != backup_root.resolve() \
+            or journal.is_symlink():
+        raise UnsafeBackupError(f"{journal} n'est pas un journal du dossier de sauvegarde "
+                                f"{backup_root}")
+    data = json.loads(journal.read_text(encoding="utf-8"))
+    steps = data.get("steps") if isinstance(data, dict) else None
+    if not isinstance(steps, list):
+        raise UnsafeBackupError("journal d'annulation illisible")
+    backup_dir = journal.with_suffix("")
+    for step in steps:  # tout ou rien : un journal douteux n'est pas rejoue du tout
+        if not isinstance(step, dict):
+            raise UnsafeBackupError("journal d'annulation illisible")
+        check_undo_step(step.get("action"), backup_dir)
     report, remaining = [], []
-    for step in reversed(data["steps"]):
+    for step in reversed(steps):
         try:
-            message, _ = _apply(step["action"], system, Path(journal).with_suffix(""))
+            message, _ = _apply(step["action"], system, backup_dir)
             report.append((step["title"], True, message))
         except (OSError, RegistryError, ValueError) as exc:
             report.append((step["title"], False, str(exc)))

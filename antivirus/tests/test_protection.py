@@ -15,6 +15,11 @@ from test_repair import FakeRegistry
 BAD = b"faux programme malveillant pour les tests"
 
 
+@pytest.fixture(autouse=True)
+def private_stop_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(schedule, "STOP_FILE", tmp_path / "watch.stop")
+
+
 @pytest.fixture
 def scanner():
     db = SignatureDB()
@@ -136,3 +141,36 @@ def test_auto_scans_downloads_and_logs(tmp_path, monkeypatch):
     assert not (downloads / "x.exe").exists()
     log = (tmp_path / "logs" / "auto.log").read_text(encoding="utf-8")
     assert "Test.Malware" in log and "mis en quarantaine" in log and "aucune cle" in log
+
+
+def test_remove_stops_running_protection_and_deletes_the_copy(tmp_path, scanner):
+    import threading
+    import time
+    system = windows(tmp_path)
+    copy = schedule.install_dir(system) / "FreeAV.exe"
+    copy.parent.mkdir(parents=True)
+    copy.write_bytes(b"MZ")
+    schedule.install(system, [str(copy)])
+    watch = watcher.FolderWatcher(scanner, [tmp_path / "vide"])
+    thread = threading.Thread(target=watch.run, args=(threading.Event(), 0.05, schedule.STOP_FILE))
+    thread.start()
+    time.sleep(0.1)
+    done = schedule.remove(system)
+    thread.join(timeout=2)
+    assert not thread.is_alive()
+    assert not copy.exists() and any("copie de FreeAV supprimee" in d for d in done)
+
+
+def test_replaced_file_with_same_size_and_date_is_rescanned(tmp_path, scanner):
+    import os
+    clean = b"x" * len(BAD)
+    target = tmp_path / "doc.exe"
+    target.write_bytes(clean)
+    os.utime(target, ns=(10**18, 10**18))
+    watch = watcher.FolderWatcher(scanner, [tmp_path])
+    other = tmp_path / "autre.tmp.download"  # nom ignore par la surveillance
+    other.write_bytes(BAD)
+    os.utime(other, ns=(10**18, 10**18))
+    os.replace(other, target)
+    watch.poll()
+    assert [e.kind for e in watch.poll()] == ["menace"]
