@@ -32,7 +32,18 @@ jobs:
         run: pip install -r requirements-dev.txt pyinstaller pillow
 
       - name: Lance les tests sous Windows
-        run: pytest
+        run: pytest -rA --junitxml=resultats-tests.xml
+
+      - name: Signale les tests en echec
+        if: failure()
+        shell: python
+        run: |
+          import xml.etree.ElementTree as ET
+          for case in ET.parse("resultats-tests.xml").iter("testcase"):
+              for bad in list(case.findall("failure")) + list(case.findall("error")):
+                  text = (bad.get("message") or "") + " | " + (bad.text or "")[-1500:]
+                  text = text.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+                  print(f"::error title={case.get('name')}::{text}")
 
       - name: Cree l'icone
         run: python packaging/make_icon.py freeav/data/freeav.ico

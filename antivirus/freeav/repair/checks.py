@@ -97,17 +97,17 @@ def _judge_command(command: str, system: System, is_malware: MalwareCheck):
     """Retourne (gravite, raison) pour une commande lancee automatiquement, ou None si saine."""
     target = target_of(command, system)
     lowered = command.lower().replace("/", "\\") if system.is_windows else command.lower()
-    if target and target.is_absolute():
-        if target.is_file():
-            threat = is_malware(target)
-            if threat:
-                return DANGER, f"programme malveillant ({threat})"
-        elif target.suffix:
-            return INFO, "le programme n'existe plus (entree orpheline)"
+    exists = bool(target and target.is_absolute() and target.is_file())
+    if exists and (threat := is_malware(target)):
+        return DANGER, f"programme malveillant ({threat})"
+    # Un emplacement suspect compte plus qu'un programme disparu : un malware peut
+    # s'effacer en laissant sa tache, prete a le retelecharger.
     if any(d in lowered for d in SUSPICIOUS_DIRS):
         return SUSPECT, "lance depuis un dossier temporaire ou de telechargement"
     if any(p.search(command) for p in SUSPICIOUS_COMMANDS):
         return SUSPECT, "commande cachee ou telechargement de code, typique des malwares"
+    if target and target.is_absolute() and not exists and target.suffix:
+        return INFO, "le programme n'existe plus (entree orpheline)"
     return None
 
 

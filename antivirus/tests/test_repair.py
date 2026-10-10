@@ -279,3 +279,11 @@ def test_cli_requires_confirmation_for_irreversible_actions(pc, monkeypatch, cap
     assert ["ipconfig", "/flushdns"] not in system.runner.calls
     assert main(["repair", "--fix", dns.id, "--yes"]) == 0
     assert system.runner.calls[-1] == ["ipconfig", "/flushdns"]
+
+
+def test_missing_program_in_temp_folder_is_still_suspect(tmp_path):
+    gone = tmp_path / "AppData" / "Local" / "Temp" / "h.exe"  # efface, la tache reste
+    system = System(registry=FakeRegistry(), runner=FakeRunner(), hosts_path=tmp_path / "x",
+                    is_windows=True, is_admin=True, home=tmp_path, environ={})
+    verdict = checks._judge_command(f'"{gone}"'.replace("/", "\\"), system, is_malware)
+    assert verdict[0] == SUSPECT
