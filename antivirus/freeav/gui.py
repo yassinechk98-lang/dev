@@ -4,11 +4,11 @@ import queue
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from . import __version__, updater
 from .clamav import ClamdClient
-from .cli import build_yara
+from .cli import build_yara, scan_exclusions
 from .quarantine import Quarantine
 from .scanner import Scanner
 from .signatures import load_default
@@ -28,6 +28,7 @@ class App(tk.Tk):
         self.target = tk.StringVar(value=str(Path.home() / "Downloads"))
         self.use_clamav = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value="Pret.")
+        self.detections: dict = {}
 
         self._build()
         self.after(100, self._poll)
@@ -88,26 +89,37 @@ class App(tk.Tk):
         self.worker.start()
 
     def _run_scan(self, target: Path):
-        clamd = None
-        if self.use_clamav.get():
-            clamd = ClamdClient()
-            if not clamd.ping():
-                self.events.put(("warn", "clamd injoignable : signatures uniquement."))
-                clamd = None
-        scanner = Scanner(load_default(), clamd, yara=build_yara([]))
-        report = scanner.scan([target], exclude={self.quarantine.directory},
-                              on_file=lambda p: self.events.put(("file", p)),
-                              should_stop=self.stop_flag.is_set)
-        self.events.put(("done", report))
+        try:
+            clamd = None
+            if self.use_clamav.get():
+                clamd = ClamdClient()
+                if not clamd.ping():
+                    self.events.put(("warn", "clamd injoignable : signatures uniquement."))
+                    clamd = None
+            scanner = Scanner(load_default(), clamd, yara=build_yara([]))
+            report = scanner.scan([target], exclude=scan_exclusions(self.quarantine.directory, []),
+                                  on_file=lambda p: self.events.put(("file", p)),
+                                  should_stop=self.stop_flag.is_set)
+            self.events.put(("done", report))
+        except Exception as exc:  # ne jamais laisser la fenetre figee
+            self.events.put(("failed", f"L'analyse a echoue : {exc}"))
 
     def _start_update(self):
+        if not updater.load_auth_key():
+            key = simpledialog.askstring(
+                "Cle abuse.ch",
+                "MalwareBazaar demande une cle gratuite (Auth-Key).\n"
+                "Creez-la sur https://auth.abuse.ch puis collez-la ici :", parent=self)
+            if not key or not key.strip():
+                return
+            updater.save_auth_key(key)
         self.update_btn.config(state="disabled")
         self.status.set("Telechargement des signatures MalwareBazaar...")
 
         def work():
             try:
-                _path, count = updater.update_malwarebazaar()
-                msg = f"{count} nouvelles signatures installees."
+                _path, added, total = updater.update_malwarebazaar()
+                msg = f"{added} nouvelles signatures, {total} au total."
             except (updater.UpdateError, OSError) as exc:
                 msg = f"Mise a jour impossible : {exc}"
             self.events.put(("updated", msg))
@@ -124,6 +136,10 @@ class App(tk.Tk):
                     messagebox.showwarning("FreeAV", payload)
                 elif kind == "done":
                     self._finish(payload)
+                elif kind == "failed":
+                    self._reset_buttons()
+                    self.status.set(payload)
+                    messagebox.showerror("FreeAV", payload)
                 elif kind == "updated":
                     self.update_btn.config(state="normal")
                     self.status.set(payload)
@@ -131,22 +147,33 @@ class App(tk.Tk):
             pass
         self.after(100, self._poll)
 
-    def _finish(self, report):
+    def _reset_buttons(self):
         self.progress.stop()
         self.scan_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
+
+    def _finish(self, report):
+        self._reset_buttons()
+        self.detections = {}
         for det in report.detections:
-            self.tree.insert("", "end", values=(det.threat, det.engine, str(det.path)))
-        verdict = "Aucune menace detectee." if report.clean else \
-            f"{len(report.detections)} menace(s) detectee(s) !"
+            engine = f"{det.engine} (suspect)" if det.suspect else det.engine
+            item = self.tree.insert("", "end", values=(det.threat, engine, str(det.path)))
+            self.detections[item] = det
+        if report.clean:
+            verdict = "Aucune menace detectee."
+        else:
+            verdict = f"{len(report.threats)} menace(s), {len(report.suspects)} suspect(s) a verifier."
+        if report.errors:
+            verdict += f" {len(report.errors)} fichier(s) illisible(s)."
         self.status.set(f"{report.scanned} fichiers analyses. {verdict}")
 
     def _quarantine_selected(self):
         moved = 0
         for item in self.tree.selection():
-            threat, _engine, path = self.tree.item(item, "values")
+            det = self.detections[item]
+            path = det.path
             try:
-                self.quarantine.isolate(Path(path), threat)
+                self.quarantine.isolate(Path(path), det.threat, det.sha256)
                 self.tree.delete(item)
                 moved += 1
             except OSError as exc:

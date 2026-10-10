@@ -1,9 +1,11 @@
 """Moteur YARA optionnel : applique des regles open source (fichiers .yar / .yara).
 
-Exemples de collections a deposer dans ~/.freeav/yara ou a passer avec --yara :
-  - https://github.com/Yara-Rules/rules            (GPL-2.0)
-  - https://github.com/Neo23x0/signature-base     (DRL 1.1)
-  - https://github.com/elastic/protections-artifacts (Elastic License 2.0)
+Collection conseillee : YARA Forge "core" (https://github.com/YARAHQ/yara-forge),
+assemblee et filtree pour limiter les faux positifs. Les grandes collections brutes
+(Yara-Rules/rules par exemple) contiennent des regles "utilitaires" qui signalent
+presque tous les fichiers sains : a eviter.
+Les detections YARA sont presentees comme "suspectes" et jamais mises en
+quarantaine automatiquement.
 Necessite le paquet yara-python ; sans lui, ce moteur est simplement desactive.
 """
 
@@ -15,6 +17,10 @@ except ImportError:  # moteur optionnel
     yara = None
 
 RULE_SUFFIXES = {".yar", ".yara"}
+
+
+class YaraScanError(Exception):
+    """Erreur d'une regle sur un fichier (delai depasse...) : signalee, sans arreter l'analyse."""
 
 
 def available() -> bool:
@@ -53,5 +59,8 @@ class YaraEngine:
     def match(self, path: Path) -> str | None:
         if self.rules is None:
             return None
-        matches = self.rules.match(str(path), timeout=30)
+        try:
+            matches = self.rules.match(str(path), timeout=30)
+        except yara.Error as exc:
+            raise YaraScanError(f"YARA : {exc}") from exc
         return f"YARA.{matches[0].rule}" if matches else None

@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import pathlib
 import stat
 import socket
 import struct
@@ -155,10 +156,10 @@ FEED = ("# MalwareBazaar recent malware samples (SHA256 hashes)\n"
 
 
 def test_update_writes_private_signature_file_used_by_scanner(tmp_path, monkeypatch):
-    monkeypatch.setattr(updater, "download", lambda url: FEED)
+    monkeypatch.setattr(updater, "download", lambda url, key="": FEED)
     sig_dir = tmp_path / "signatures"
-    path, count = updater.update_malwarebazaar(directory=sig_dir)
-    assert count == 2
+    path, added, total = updater.update_malwarebazaar(directory=sig_dir, auth_key="")
+    assert (added, total) == (2, 2)
     if os.name == "posix":
         assert stat.S_IMODE(sig_dir.stat().st_mode) == 0o700
     (tmp_path / "x.exe").write_bytes(b"malware-b")
@@ -174,12 +175,12 @@ def test_update_writes_private_signature_file_used_by_scanner(tmp_path, monkeypa
 ])
 def test_update_rejects_tampered_feed_and_keeps_old_db(tmp_path, monkeypatch, feed):
     sig_dir = tmp_path / "signatures"
-    monkeypatch.setattr(updater, "download", lambda url: FEED)
-    updater.update_malwarebazaar(directory=sig_dir)
+    monkeypatch.setattr(updater, "download", lambda url, key="": FEED)
+    updater.update_malwarebazaar(directory=sig_dir, auth_key="")
     before = (sig_dir / "malwarebazaar.txt").read_text()
-    monkeypatch.setattr(updater, "download", lambda url: feed)
+    monkeypatch.setattr(updater, "download", lambda url, key="": feed)
     with pytest.raises(updater.UpdateError):
-        updater.update_malwarebazaar(directory=sig_dir)
+        updater.update_malwarebazaar(directory=sig_dir, auth_key="")
     assert (sig_dir / "malwarebazaar.txt").read_text() == before
     assert [p.name for p in sig_dir.iterdir()] == ["malwarebazaar.txt"]
 
@@ -243,3 +244,173 @@ def test_tampered_quarantine_record_cannot_write_elsewhere(sample_dir, tmp_path_
     meta_file.write_text(json.dumps(meta))
     with pytest.raises(OSError):
         q.restore(item_id)
+
+
+# --- Corrections issues de la validation independante --------------------------------
+
+import urllib.error  # noqa: E402
+import urllib.request  # noqa: E402
+
+from freeav import cli  # noqa: E402
+from freeav.scanner import iter_files  # noqa: E402
+from freeav.yara_engine import YaraScanError  # noqa: E402
+
+
+class _FakeYara:
+    """Moteur YARA factice : signale tout fichier contenant 'motif-suspect'."""
+
+    def __init__(self, error_on: str = ""):
+        self.error_on = error_on
+
+    def __len__(self):
+        return 1
+
+    def match(self, path):
+        if self.error_on and self.error_on in str(path):
+            raise YaraScanError("YARA : delai depasse")
+        return "YARA.Motif" if b"motif-suspect" in path.read_bytes() else None
+
+
+def test_yara_suspects_are_never_quarantined_automatically(sample_dir, tmp_path_factory,
+                                                           monkeypatch, capsys):
+    (sample_dir / "outil.ps1").write_text("motif-suspect")
+    monkeypatch.setattr(cli, "build_yara", lambda extra: _FakeYara())
+    qdir = tmp_path_factory.mktemp("q")
+    assert main(["--quarantine-dir", str(qdir), "scan", str(sample_dir), "--quarantine"]) == 1
+    out = capsys.readouterr().out
+    assert "SUSPECT" in out and "pas de quarantaine automatique" in out
+    assert (sample_dir / "outil.ps1").exists()
+    assert not (sample_dir / "sous-dossier" / "eicar.com").exists()  # vraie menace isolee
+
+
+def test_clean_files_are_not_flagged():
+    """Lot de fichiers sains : le code source de FreeAV lui-meme (Python, Markdown, YAML)."""
+    root = pathlib.Path(__file__).resolve().parents[1]
+    report = Scanner(load_default()).scan([root], exclude={root / "tests"})
+    assert report.scanned > 10
+    assert report.detections == []
+
+
+def test_freeav_own_data_is_excluded_from_scan(tmp_path, monkeypatch):
+    app = tmp_path / ".freeav"
+    yara_dir = app / "yara"
+    yara_dir.mkdir(parents=True)
+    (yara_dir / "regle.yar").write_text('rule R { strings: $a = "motif-suspect" condition: $a }')
+    (tmp_path / "doc.txt").write_text("sain")
+    monkeypatch.setattr(cli, "APP_DIR", app)
+    monkeypatch.setattr(cli, "YARA_DIR", yara_dir)
+    exclude = cli.scan_exclusions(app / "quarantine", [])
+    files = [p.name for p in iter_files(tmp_path, exclude)]
+    assert files == ["doc.txt"]
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="tubes nommes Unix")
+def test_named_pipe_does_not_block_the_scan(sample_dir):
+    os.mkfifo(sample_dir / "piege.fifo")
+    result = {}
+    thread = threading.Thread(
+        target=lambda: result.setdefault("r", Scanner(load_default()).scan([sample_dir])),
+        daemon=True)
+    thread.start()
+    thread.join(timeout=10)
+    assert not thread.is_alive(), "l'analyse est bloquee par un tube nomme"
+    assert [d.path.name for d in result["r"].detections] == ["eicar.com"]
+    report = Scanner(load_default()).scan([sample_dir / "piege.fifo"])
+    assert report.scanned == 0
+
+
+def test_yara_error_on_one_file_does_not_stop_the_scan(sample_dir):
+    (sample_dir / "lent.bin").write_bytes(b"x")
+    report = Scanner(load_default(), yara=_FakeYara(error_on="lent.bin")).scan([sample_dir])
+    assert [d.path.name for d in report.detections] == ["eicar.com"]
+    assert [p.name for p, _ in report.errors] == ["lent.bin"]
+
+
+def test_failed_quarantine_leaves_no_fake_entry_and_continues(sample_dir, tmp_path_factory,
+                                                              monkeypatch, capsys):
+    second = sample_dir / "eicar2.com"
+    second.write_bytes(EICAR)
+    locked = sample_dir / "sous-dossier" / "eicar.com"
+    real_unlink = pathlib.Path.unlink
+
+    def unlink(self, *args, **kwargs):
+        if self == locked.resolve():
+            raise PermissionError("fichier verrouille")
+        return real_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(pathlib.Path, "unlink", unlink)
+    qdir = tmp_path_factory.mktemp("q")
+    assert main(["--quarantine-dir", str(qdir), "scan", str(sample_dir), "--quarantine"]) == 1
+    assert "quarantaine impossible" in capsys.readouterr().out
+    assert locked.exists() and not second.exists()
+    items = Quarantine(qdir).list()
+    assert [pathlib.Path(i["original_path"]).name for i in items] == ["eicar2.com"]
+    assert len(list(qdir.iterdir())) == 2  # un seul .bin + .json
+
+
+def test_quarantine_refuses_file_changed_since_scan(sample_dir, tmp_path_factory):
+    q = Quarantine(tmp_path_factory.mktemp("q"))
+    target = sample_dir / "sain.txt"
+    with pytest.raises(OSError):
+        q.isolate(target, "EICAR-Test-File", hashlib.sha256(EICAR).hexdigest())
+    assert target.exists() and q.list() == []
+
+
+@pytest.mark.skipif(os.name != "posix", reason="droits Unix")
+def test_restore_keeps_original_permissions(tmp_path):
+    script = tmp_path / "script.sh"
+    script.write_bytes(EICAR)
+    script.chmod(0o755)
+    q = Quarantine(tmp_path / "q")
+    restored = q.restore(q.isolate(script, "EICAR-Test-File"))
+    assert stat.S_IMODE(restored.stat().st_mode) == 0o755
+
+
+def test_update_refuses_redirect_to_plain_http():
+    handler = updater._HttpsOnlyRedirects()
+    req = urllib.request.Request("https://bazaar.abuse.ch/export/txt/sha256/recent/")
+    with pytest.raises(updater.UpdateError):
+        handler.redirect_request(req, None, 302, "Found", {}, "http://evil.example/feed")
+    assert handler.redirect_request(req, None, 302, "Found", {},
+                                    "https://bazaar.abuse.ch/autre/") is not None
+
+
+class _FakeOpener:
+    def __init__(self, status=200):
+        self.status, self.request = status, None
+
+    def open(self, request, timeout):
+        self.request = request
+        if self.status != 200:
+            raise urllib.error.HTTPError(request.full_url, self.status, "Forbidden", {}, None)
+        import io
+        return io.BytesIO(FEED)
+
+
+def test_update_sends_auth_key_and_explains_missing_key(monkeypatch):
+    opener = _FakeOpener()
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *handlers: opener)
+    assert updater.download(updater.MALWAREBAZAAR_URL, auth_key="ma-cle") == FEED
+    assert opener.request.get_header("Auth-key") == "ma-cle"
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *handlers: _FakeOpener(401))
+    with pytest.raises(updater.UpdateError, match="Auth-Key"):
+        updater.download(updater.MALWAREBAZAAR_URL)
+
+
+def test_updates_accumulate_instead_of_replacing(tmp_path, monkeypatch):
+    sig_dir = tmp_path / "signatures"
+    monkeypatch.setattr(updater, "download", lambda url, key="": FEED)
+    updater.update_malwarebazaar(directory=sig_dir, auth_key="")
+    newer = ("#\n" + hashlib.sha256(b"malware-c").hexdigest() + "\n").encode()
+    monkeypatch.setattr(updater, "download", lambda url, key="": newer)
+    _path, added, total = updater.update_malwarebazaar(directory=sig_dir, auth_key="")
+    assert (added, total) == (1, 3)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="droits Unix")
+def test_auth_key_is_saved_privately(tmp_path, monkeypatch):
+    monkeypatch.delenv(updater.AUTH_KEY_ENV, raising=False)
+    config = tmp_path / "app" / "config.json"
+    updater.save_auth_key(" cle-secrete ", config)
+    assert updater.load_auth_key(config) == "cle-secrete"
+    assert stat.S_IMODE(config.stat().st_mode) == 0o600

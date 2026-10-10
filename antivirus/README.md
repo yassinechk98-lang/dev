@@ -1,7 +1,7 @@
 # FreeAV : prototype d'antivirus gratuit
 
 Scanner de fichiers en Python. Il fonctionne avec la seule bibliotheque standard ; le moteur YARA
-est optionnel (`pip install -r requirements-optional.txt`).
+est optionnel (`pip install -r requirements-optional.txt`). Python 3.10 ou plus recent.
 
 ## Fonctionnalites
 
@@ -9,11 +9,16 @@ est optionnel (`pip install -r requirements-optional.txt`).
   (`freeav/data/signatures.txt`). Les bases de hachage ClamAV (`.hdb`, `.hsb`) se chargent avec `--db`.
 - **Moteur ClamAV optionnel** : si le demon `clamd` tourne, FreeAV lui envoie chaque fichier
   (protocole INSTREAM) et profite de ses millions de signatures.
-- **Regles YARA open source** : FreeAV applique les regles de la communaute, par exemple
-  [Yara-Rules/rules](https://github.com/Yara-Rules/rules) (GPL-2.0). Deposez-les dans `~/.freeav/yara`
-  ou passez `--yara <dossier>`. Les fichiers de regles invalides sont ignores un par un.
+- **Regles YARA open source** : FreeAV applique les regles de la communaute. Nous conseillons le
+  paquet **core** de [YARA Forge](https://github.com/YARAHQ/yara-forge), filtre pour limiter les faux
+  positifs (0 fausse alerte sur 954 fichiers sains lors de nos essais). Les detections YARA sont
+  affichees comme **suspectes** et ne sont jamais mises en quarantaine automatiquement.
+  Evitez les grandes collections brutes comme Yara-Rules/rules : leurs regles "utilitaires"
+  signalent presque tous les fichiers sains.
 - **Base publique MalwareBazaar** : `python -m freeav update` telecharge les empreintes des malwares
-  recents publiees par [abuse.ch](https://bazaar.abuse.ch) (CC0), en HTTPS, avec verification stricte.
+  des 48 dernieres heures publiees par [abuse.ch](https://bazaar.abuse.ch) (CC0), en HTTPS, avec
+  verification stricte. Chaque mise a jour s'ajoute aux precedentes. abuse.ch demande une cle
+  gratuite (Auth-Key) a creer sur https://auth.abuse.ch.
 - **Quarantaine** : les fichiers infectes sont deplaces dans `~/.freeav/quarantine`, encodes pour ne
   plus etre executables, et peuvent etre restaures ou supprimes.
 - **Ligne de commande** et **interface graphique** (Tkinter).
@@ -29,11 +34,14 @@ python -m freeav scan ~/Downloads
 # Mettre automatiquement les menaces en quarantaine, avec ClamAV en plus
 python -m freeav scan ~/Downloads --quarantine --clamav
 
-# Mettre a jour les signatures (MalwareBazaar)
+# Mettre a jour les signatures (MalwareBazaar), la premiere fois avec votre cle
+python -m freeav update --auth-key VOTRE_CLE --save-key
 python -m freeav update
 
-# Ajouter les regles YARA de la communaute
-git clone --depth 1 https://github.com/Yara-Rules/rules ~/.freeav/yara/yara-rules
+# Ajouter les regles YARA de YARA Forge (paquet core)
+#   telecharger yara-forge-rules-core.zip depuis
+#   https://github.com/YARAHQ/yara-forge/releases/latest
+#   puis copier yara-rules-core.yar dans ~/.freeav/yara/
 python -m freeav scan ~/Downloads
 
 # Gerer la quarantaine
@@ -66,6 +74,7 @@ pytest
 
 ## Limites du prototype
 
+Les fichiers de plus de 200 Mo ne sont pas analyses (ils sont comptes comme "ignores").
 Pas encore de protection en temps reel ni de mise a jour automatique planifiee. Aucun antivirus,
 gratuit ou payant, ne detecte toutes les menaces : FreeAV complete les bonnes pratiques
 (mises a jour du systeme, sauvegardes, prudence avec les pieces jointes), il ne les remplace pas.

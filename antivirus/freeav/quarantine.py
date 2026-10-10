@@ -5,8 +5,10 @@ re-detecte par d'autres antivirus), avec un fichier .json decrivant son origine.
 Le dossier de quarantaine n'est accessible qu'a son proprietaire (0700).
 """
 
+import hashlib
 import json
 import os
+import stat
 import time
 import uuid
 from pathlib import Path
@@ -34,21 +36,38 @@ class Quarantine:
     def __init__(self, directory: Path = DEFAULT_DIR):
         self.directory = Path(directory)
 
-    def isolate(self, path: Path, threat: str) -> str:
+    def isolate(self, path: Path, threat: str, expected_sha256: str = "") -> str:
+        """Met le fichier en quarantaine. Si expected_sha256 est donne, refuse le fichier
+        s'il a change depuis l'analyse (il pourrait s'agir d'un autre fichier)."""
         path = Path(path)
         if path.is_symlink():
             raise OSError(f"{path} est un lien symbolique, mise en quarantaine refusee")
+        if not stat.S_ISREG(os.stat(path).st_mode):
+            raise OSError(f"{path} n'est pas un fichier ordinaire")
         ensure_private_dir(self.directory)
         item_id = uuid.uuid4().hex
         path = path.resolve()
         blob = self.directory / f"{item_id}.bin"
-        with open(path, "rb") as src, _open_private(blob, 0) as dst:
-            while chunk := src.read(CHUNK):
-                dst.write(_xor(chunk))
-        meta = {"original_path": str(path), "threat": threat, "date": time.time()}
-        with _open_private(self.directory / f"{item_id}.json", 0) as fh:
-            fh.write(json.dumps(meta).encode("utf-8"))
-        path.unlink()
+        meta_file = self.directory / f"{item_id}.json"
+        try:
+            digest = hashlib.sha256()
+            with open(path, "rb") as src, _open_private(blob, 0) as dst:
+                while chunk := src.read(CHUNK):
+                    digest.update(chunk)
+                    dst.write(_xor(chunk))
+            if expected_sha256 and digest.hexdigest() != expected_sha256:
+                raise OSError(f"{path} a change depuis l'analyse, mise en quarantaine annulee")
+            meta = {"original_path": str(path), "threat": threat, "date": time.time(),
+                    "sha256": digest.hexdigest(), "mode": stat.S_IMODE(os.stat(path).st_mode)}
+            with _open_private(meta_file, 0) as fh:
+                fh.write(json.dumps(meta).encode("utf-8"))
+            path.unlink()
+        except BaseException:
+            # Original impossible a supprimer (dossier en lecture seule, fichier verrouille...) :
+            # on retire la copie pour que la quarantaine ne mente pas.
+            blob.unlink(missing_ok=True)
+            meta_file.unlink(missing_ok=True)
+            raise
         return item_id
 
     def exists(self, item_id: str) -> bool:
@@ -78,6 +97,9 @@ class Quarantine:
         with open(blob, "rb") as src, _open_private(target, 0) as dst:
             while chunk := src.read(CHUNK):
                 dst.write(_xor(chunk))
+        if isinstance(meta.get("mode"), int):
+            # Droits d'origine (executable...), sans les bits speciaux setuid/setgid.
+            target.chmod(meta["mode"] & 0o777)
         blob.unlink()
         meta_file.unlink()
         return target

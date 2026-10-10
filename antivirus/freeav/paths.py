@@ -15,4 +15,6 @@ def ensure_private_dir(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     if os.name == "posix":
         path.chmod(0o700)
+        if APP_DIR in path.parents:
+            APP_DIR.chmod(0o700)
     return path
