@@ -47,6 +47,32 @@ foreach ($folder in @([Environment]::GetFolderPath('Programs'), [Environment]::G
 """
 
 
+# Lance a part apres la desinstallation : un programme ne peut pas effacer son propre fichier.
+# Le chemin passe par l'environnement (aucun echappement, & ou ^ dans le profil sans danger).
+SELF_DELETE_SCRIPT = r"""
+for ($i = 0; $i -lt 60 -and (Test-Path -LiteralPath $env:FREEAV_EXE); $i++) {
+  Start-Sleep -Seconds 1
+  Remove-Item -LiteralPath $env:FREEAV_EXE -Force -ErrorAction SilentlyContinue
+}
+$dir = Split-Path -LiteralPath $env:FREEAV_EXE
+if (-not (Test-Path -LiteralPath $env:FREEAV_EXE)) {
+  Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+}
+"""
+
+
+def _spawn_self_delete(exe: Path) -> None:
+    import os
+    flags = (getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NO_WINDOW", 0)
+             | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    env = {k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"}
+    env["FREEAV_EXE"] = str(exe)
+    subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                      "-WindowStyle", "Hidden", "-Command", SELF_DELETE_SCRIPT],
+                     env=env, close_fds=True, creationflags=flags,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 class InstallError(Exception):
     pass
 
@@ -128,7 +154,7 @@ def install(system: System, source: Path | None = None) -> list[str]:
     return done
 
 
-def uninstall(system: System) -> list[str]:
+def uninstall(system: System, spawn=None) -> list[str]:
     if not system.is_windows:
         raise InstallError("la desinstallation est prevue pour Windows")
     done = []
@@ -151,10 +177,7 @@ def uninstall(system: System) -> list[str]:
     done.append("moteur ClamAV integre supprime")
     if exe.exists():
         if running_installed_copy(system):
-            # Un programme ne peut pas effacer son propre fichier : Windows le fera juste apres.
-            system.run(["cmd", "/c", "start", "", "/min", "cmd", "/c",
-                        f'ping 127.0.0.1 -n 4 >nul & del /f /q "{exe}" & rmdir "{exe.parent}"'],
-                       timeout=30)
+            (spawn or _spawn_self_delete)(exe)
             done.append(f"FreeAV.exe sera supprime dans quelques secondes ({exe.parent})")
         else:
             try:

@@ -39,10 +39,26 @@ def build_yara(extra: list[str]) -> yara_engine.YaraEngine | None:
     return engine
 
 
+def scan_argument(value: str | None) -> str | None:
+    """Clic droit sur un lecteur : Windows passe "E:\\" et la ligne --scan "E:\\" se lit E:"
+    (le \\" final est un guillemet echappe). On remet la barre."""
+    if value and value.endswith('"'):
+        value = value[:-1] + "\\"
+    return value
+
+
 def batch_engines(defender: bool = False, clamav: bool = True) -> list:
     """Moteurs complets en plus des signatures FreeAV : ClamAV integre (s'il est installe)
-    et, sur demande, Microsoft Defender en deuxieme avis."""
+    et, sur demande, Microsoft Defender en deuxieme avis.
+
+    En administrateur, ClamAV integre n'est pas lance : il est installe dans un dossier de
+    l'utilisateur, modifiable sans droits, et ne doit pas tourner avec des droits eleves."""
+    from .quarantine import _is_elevated
     engines = []
+    if clamav and _is_elevated():
+        print("Attention : en administrateur, ClamAV integre n'est pas utilise "
+              "(lancez FreeAV normalement).", file=sys.stderr)
+        clamav = False
     if clamav:
         from .clamav_local import ClamscanEngine, LocalClamav
         local = LocalClamav()
@@ -542,7 +558,8 @@ def main(argv: list[str] | None = None) -> int:
 
     gui = sub.add_parser("gui", help="ouvrir l'interface graphique")
     gui.add_argument("--scan", metavar="CHEMIN", help="analyser tout de suite ce fichier ou dossier")
-    gui.set_defaults(func=lambda a: __import__("freeav.gui", fromlist=["run"]).run(scan=a.scan))
+    gui.set_defaults(func=lambda a: __import__("freeav.gui", fromlist=["run"]).run(
+        scan=scan_argument(a.scan)))
 
     args = parser.parse_args(argv)
     return args.func(args) or 0

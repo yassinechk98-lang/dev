@@ -188,7 +188,11 @@ class App(tk.Tk):
         self.banner_label.config(fg=fg)
 
     def _refresh_engines(self):
-        if self.local_clamav.ready():
+        from .quarantine import _is_elevated
+        if _is_elevated():
+            self.clamav_state.set("+ ClamAV integre : non utilise en administrateur")
+            self.clamav_btn.pack_forget()
+        elif self.local_clamav.ready():
             self.clamav_state.set("+ ClamAV integre : pret")
             self.clamav_btn.config(text="Mettre a jour ClamAV")
         elif self.clamav_offer:

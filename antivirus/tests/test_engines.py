@@ -170,10 +170,13 @@ def test_usb_drive_is_scanned_when_plugged_in(tmp_path):
                                   on_event=seen.append, removable_drives=lambda: drives)
     assert watch.poll() == []
     drives.add(str(usb))  # la cle est branchee
-    events = watch.poll()
-    assert [e.kind for e in events] == ["quarantaine", "usb"]
+    assert watch.poll() == []  # analysee en arriere-plan : la surveillance continue
+    watch.wait_drives(30)
+    assert [e.kind for e in seen] == ["quarantaine", "usb"]
     assert not (usb / "autorun.exe").exists()
-    assert watch.poll() == []  # deja analysee tant qu'elle reste branchee
+    watch.poll()
+    watch.wait_drives(30)
+    assert len(seen) == 2  # deja analysee tant qu'elle reste branchee
 
 
 def windows_system(tmp_path):
@@ -246,3 +249,55 @@ def test_real_clamav_install_update_and_scan(tmp_path):
         pytest.skip("le fichier de test a ete supprime par l'antivirus du serveur")
     found = local.scan_paths([sample, tmp_path / "echantillon"])
     assert any("Eicar" in t for p, t in found.items()), found
+
+
+def test_uninstall_of_the_running_installed_copy_deletes_it_afterwards(tmp_path, monkeypatch):
+    system, calls = windows_system(tmp_path)
+    source = tmp_path / "FreeAV.exe"
+    source.write_bytes(b"MZ" * 10)
+    installer.install(system, source)
+    exe = installer.target_exe(system)
+    monkeypatch.setattr(installer, "running_installed_copy", lambda system: True)
+    spawned = []
+    done = installer.uninstall(system, spawn=spawned.append)
+    assert spawned == [exe]  # le chemin passe par l'environnement, pas par une ligne de cmd
+    assert "FREEAV_EXE" in installer.SELF_DELETE_SCRIPT and "-LiteralPath" in installer.SELF_DELETE_SCRIPT
+    assert any("quelques secondes" in d for d in done)
+
+
+def test_right_click_on_a_drive_keeps_the_drive_path():
+    from freeav.cli import scan_argument
+    assert scan_argument('E:"') == "E:\\"
+    assert scan_argument(r"C:\Users\moi\fichier.exe") == r"C:\Users\moi\fichier.exe"
+    assert scan_argument(None) is None
+
+
+@pytest.mark.skipif(not WINDOWS, reason="decoupage reel de la ligne de commande Windows")
+def test_registered_drive_command_is_split_back_to_the_drive(tmp_path):
+    import ctypes
+    from ctypes import wintypes
+    from freeav.cli import scan_argument
+    system, _ = windows_system(tmp_path)
+    source = tmp_path / "FreeAV.exe"
+    source.write_bytes(b"MZ")
+    installer.install(system, source)
+    command = system.registry.get("HKCU", r"Software\Classes\Drive\shell\FreeAV\command", "")[0]
+    line = command.replace("%1", "E:\\")
+    split = ctypes.windll.shell32.CommandLineToArgvW
+    split.restype = ctypes.POINTER(wintypes.LPWSTR)
+    count = ctypes.c_int()
+    argv = split(line, ctypes.byref(count))
+    args = [argv[i] for i in range(count.value)]
+    assert args[1:3] == ["gui", "--scan"]
+    assert scan_argument(args[3]) == "E:\\"
+
+
+def test_integrated_clamav_is_not_run_as_administrator(tmp_path, monkeypatch):
+    monkeypatch.setattr("freeav.quarantine._is_elevated", lambda: True)
+    local = LocalClamav(tmp_path / "ClamAV")
+    with pytest.raises(ClamavError, match="administrateur"):
+        local.scan_paths([tmp_path])
+    with pytest.raises(ClamavError, match="administrateur"):
+        local.update()
+    from freeav.cli import batch_engines
+    assert batch_engines(clamav=True) == []

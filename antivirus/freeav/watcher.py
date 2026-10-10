@@ -83,6 +83,7 @@ class FolderWatcher:
         self.on_event = on_event or (lambda event: None)
         self._known = _snapshot(self.folders, self.exclude)  # deja presents : pas re-analyses
         self._pending: dict[Path, tuple] = {}
+        self._drive_scans: list[threading.Thread] = []
         self.scanned = 0
 
     def poll(self) -> list[WatchEvent]:
@@ -91,8 +92,13 @@ class FolderWatcher:
         if self.removable_drives:
             drives = set(self.removable_drives())
             for drive in sorted(drives - self._drives):
-                events += self._scan_drive(drive)
+                # En arriere-plan : Telechargements et Bureau restent surveilles pendant
+                # l'analyse d'une grosse cle.
+                scan = threading.Thread(target=self._scan_drive, args=(drive,), daemon=True)
+                scan.start()
+                self._drive_scans.append(scan)
             self._drives = drives
+            self._drive_scans = [t for t in self._drive_scans if t.is_alive()]
         current = _snapshot(self.folders, self.exclude)
         for path, sig in current.items():
             if self._known.get(path) == sig:
@@ -115,7 +121,13 @@ class FolderWatcher:
         return events
 
     def _scan_drive(self, drive: str) -> list[WatchEvent]:
-        report = self.scanner.scan([Path(drive)], exclude=self.exclude)
+        """Analyse complete d'un lecteur amovible ; les evenements partent par on_event."""
+        try:
+            report = self.scanner.scan([Path(drive)], exclude=self.exclude)
+        except Exception as exc:  # cle retiree pendant l'analyse, moteur en erreur...
+            event = WatchEvent("erreur", Path(drive), f"cle USB {drive} : analyse impossible ({exc})")
+            self.on_event(event)
+            return [event]
         events = []
         for det in report.detections:
             if det.suspect or not self.quarantine:
@@ -133,7 +145,14 @@ class FolderWatcher:
         verdict = (f"{len(report.threats)} menace(s)" if report.detections else "aucune menace")
         events.append(WatchEvent("usb", Path(drive), f"cle USB {drive} analysee : "
                                  f"{report.scanned} fichiers, {verdict}"))
+        for event in events:
+            self.on_event(event)
         return events
+
+    def wait_drives(self, timeout: float | None = None) -> None:
+        """Attend la fin des analyses de cles USB en cours."""
+        for scan in list(self._drive_scans):
+            scan.join(timeout)
 
     def _scan(self, path: Path) -> WatchEvent | None:
         try:

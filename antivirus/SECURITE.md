@@ -51,6 +51,12 @@
   (teste avec une vraie jonction sur Windows).
 - **En administrateur, la quarantaine ne restaure que dans votre dossier personnel** : elle est
   modifiable sans droits, une fausse fiche ne doit pas pouvoir ecrire dans `C:\Windows`.
+- **En administrateur, ClamAV integre n'est pas lance** : il est installe dans
+  `%LOCALAPPDATA%\FreeAV\ClamAV`, modifiable sans droits. Microsoft Defender est alors cherche dans
+  les dossiers systeme donnes par Windows, pas dans des variables d'environnement.
+- **Limite** : FreeAV installe pour l'utilisateur (sans droits) puis lance en administrateur reste
+  expose a un programme malveillant deja actif sous le meme compte, qui aurait pu remplacer
+  `FreeAV.exe` lui-meme. Lancez FreeAV normalement, sauf pour une reparation qui le demande.
 
 ## Securite du code (GitHub)
 

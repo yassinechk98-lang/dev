@@ -143,7 +143,14 @@ jobs:
           if ($menu -notlike "*FreeAV.exe*gui --scan*%1*") { Echec "clic droit incorrect : $menu" }
           $raccourci = Join-Path ([Environment]::GetFolderPath('Programs')) "FreeAV.lnk"
           if (-not (Test-Path $raccourci)) { Echec "raccourci du menu Demarrer absent" }
-          if ((Lance @("uninstall", "--yes")) -ne 0) { Echec "desinstallation de FreeAV" }
+          # Desinstallation par la copie installee (comme depuis Parametres > Applications) :
+          # FreeAV.exe doit s'effacer lui-meme juste apres
+          $p = Start-Process $installe -ArgumentList "uninstall", "--yes" -Wait -PassThru `
+            -RedirectStandardOutput sortie.txt -RedirectStandardError erreurs.txt
+          Get-Content sortie.txt, erreurs.txt | Write-Host
+          if ($p.ExitCode -ne 0) { Echec "desinstallation de FreeAV" }
+          for ($i = 0; $i -lt 30 -and (Test-Path (Split-Path $installe)); $i++) { Start-Sleep -Seconds 1 }
+          if (Test-Path (Split-Path $installe)) { Echec "dossier de FreeAV toujours present apres la desinstallation" }
           if (Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\FreeAV") { Echec "toujours dans Parametres > Applications" }
           if (Test-Path -LiteralPath "HKCU:\Software\Classes\*\shell\FreeAV") { Echec "clic droit toujours present" }
           if (Test-Path $raccourci) { Echec "raccourci toujours present" }

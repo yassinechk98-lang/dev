@@ -20,9 +20,27 @@ class DefenderError(Exception):
     pass
 
 
+def _system_folder(csidl: int) -> str | None:
+    """Dossier systeme donne par Windows (pas par une variable d'environnement, qu'un programme
+    peut changer avant de lancer FreeAV en administrateur)."""
+    if os.name != "nt":
+        return None
+    import ctypes
+    buf = ctypes.create_unicode_buffer(260)
+    if ctypes.windll.shell32.SHGetFolderPathW(None, csidl, None, 0, buf) != 0:
+        return None
+    return buf.value
+
+
+CSIDL_COMMON_APPDATA, CSIDL_PROGRAM_FILES = 0x23, 0x26
+
+
 def find_mpcmdrun(environ: dict | None = None) -> Path | None:
     """Version la plus recente de MpCmdRun.exe (la plateforme se met a jour hors de Program Files)."""
-    env = os.environ if environ is None else environ
+    if environ is None:
+        environ = {"ProgramData": _system_folder(CSIDL_COMMON_APPDATA) or r"C:\ProgramData",
+                   "ProgramFiles": _system_folder(CSIDL_PROGRAM_FILES) or r"C:\Program Files"}
+    env = environ
     candidates = []
     platform = Path(env.get("ProgramData", r"C:\ProgramData"), "Microsoft", "Windows Defender",
                     "Platform")

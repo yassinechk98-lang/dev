@@ -49,6 +49,15 @@ def manifest() -> dict | None:
     return data
 
 
+def _refuse_elevated() -> None:
+    """ClamAV integre vit dans un dossier de l'utilisateur, modifiable sans droits : le lancer
+    en administrateur donnerait ces droits a ce qu'un autre programme y aurait depose."""
+    from . import quarantine
+    if quarantine._is_elevated():
+        raise ClamavError("ClamAV integre n'est pas utilise quand FreeAV est lance en "
+                          "administrateur : relancez FreeAV normalement")
+
+
 def _find(root: Path, name: str) -> Path | None:
     hits = sorted(root.rglob(name)) if root.is_dir() else []
     return hits[0] if hits else None
@@ -84,6 +93,7 @@ class LocalClamav:
                 package: Path | None = None) -> None:
         """Telecharge le paquet indique par le manifeste (ou utilise package, deja verifie
         par l'appelant), l'installe, puis telecharge les signatures."""
+        _refuse_elevated()
         info = info or manifest()
         if not info and package is None:
             raise ClamavError("cette version de FreeAV ne propose pas l'installation de ClamAV")
@@ -113,6 +123,7 @@ class LocalClamav:
         return conf
 
     def update(self, progress: Callable[[str], None] = lambda message: None) -> str:
+        _refuse_elevated()
         if not self.freshclam:
             raise ClamavError("ClamAV n'est pas installe")
         progress("Telechargement des signatures officielles ClamAV (environ 300 Mo la premiere fois)...")
@@ -130,6 +141,7 @@ class LocalClamav:
 
     # -- analyse ---------------------------------------------------------------------------
     def scan_paths(self, paths: list[Path]) -> dict[Path, str]:
+        _refuse_elevated()
         if not self.ready():
             raise ClamavError("ClamAV n'a pas encore de signatures")
         found: dict[Path, str] = {}
