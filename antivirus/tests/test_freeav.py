@@ -67,16 +67,21 @@ def test_cli_exit_code_and_quarantine(sample_dir, tmp_path_factory, capsys):
     assert main(["--quarantine-dir", str(qdir), "scan", str(sample_dir)]) == 0
 
 
+def _recv_exact(conn: socket.socket, n: int) -> bytes:
+    data = b""
+    while len(data) < n:
+        chunk = conn.recv(n - len(data))
+        assert chunk, "connexion fermee trop tot"
+        data += chunk
+    return data
+
+
 def _fake_clamd(server: socket.socket, verdict: bytes):
     conn, _ = server.accept()
     with conn:
-        assert conn.recv(11) == b"zINSTREAM\0"
-        while True:
-            size = struct.unpack("!L", conn.recv(4))[0]
-            if size == 0:
-                break
-            while size:
-                size -= len(conn.recv(size))
+        assert _recv_exact(conn, 10) == b"zINSTREAM\0"
+        while size := struct.unpack("!L", _recv_exact(conn, 4))[0]:
+            _recv_exact(conn, size)
         conn.sendall(verdict)
 
 
