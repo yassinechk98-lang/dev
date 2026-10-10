@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .clamav import ClamdClient, ClamdError
 from .signatures import SignatureDB
+from .yara_engine import YaraEngine
 
 MAX_SIZE = 200 * 1024 * 1024  # fichiers plus gros ignores (200 Mo)
 
@@ -16,7 +17,7 @@ MAX_SIZE = 200 * 1024 * 1024  # fichiers plus gros ignores (200 Mo)
 class Detection:
     path: Path
     threat: str
-    engine: str  # "signatures" ou "clamav"
+    engine: str  # "signatures", "yara" ou "clamav"
 
 
 @dataclass
@@ -56,15 +57,18 @@ def iter_files(target: Path, exclude: set[Path] | None = None) -> Iterator[Path]
 
 class Scanner:
     def __init__(self, db: SignatureDB, clamd: ClamdClient | None = None,
-                 max_size: int = MAX_SIZE):
+                 max_size: int = MAX_SIZE, yara: YaraEngine | None = None):
         self.db = db
         self.clamd = clamd
+        self.yara = yara
         self.max_size = max_size
 
     def scan_file(self, path: Path) -> Detection | None:
         sha256, md5 = hash_file(path)
         if threat := self.db.lookup(sha256, md5):
             return Detection(path, threat, "signatures")
+        if self.yara and (threat := self.yara.match(path)):
+            return Detection(path, threat, "yara")
         if self.clamd and (threat := self.clamd.scan_file(path)):
             return Detection(path, threat, "clamav")
         return None

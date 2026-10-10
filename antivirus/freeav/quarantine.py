@@ -2,19 +2,32 @@
 
 Chaque fichier est stocke XOR-encode (pour qu'il ne soit plus executable ni
 re-detecte par d'autres antivirus), avec un fichier .json decrivant son origine.
+Le dossier de quarantaine n'est accessible qu'a son proprietaire (0700).
 """
 
 import json
+import os
 import time
 import uuid
 from pathlib import Path
 
-DEFAULT_DIR = Path.home() / ".freeav" / "quarantine"
+from .paths import QUARANTINE_DIR, ensure_private_dir
+
+DEFAULT_DIR = QUARANTINE_DIR
 XOR_KEY = 0xA5
+CHUNK = 1024 * 1024
+_XOR_TABLE = bytes(b ^ XOR_KEY for b in range(256))
 
 
 def _xor(data: bytes) -> bytes:
-    return bytes(b ^ XOR_KEY for b in data)
+    return data.translate(_XOR_TABLE)
+
+
+def _open_private(path: Path, flags: int):
+    """Ouvre en creation exclusive, sans suivre de lien symbolique, en mode 0600."""
+    flags |= os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) \
+        | getattr(os, "O_BINARY", 0)
+    return os.fdopen(os.open(path, flags, 0o600), "wb")
 
 
 class Quarantine:
@@ -22,12 +35,19 @@ class Quarantine:
         self.directory = Path(directory)
 
     def isolate(self, path: Path, threat: str) -> str:
-        self.directory.mkdir(parents=True, exist_ok=True)
+        path = Path(path)
+        if path.is_symlink():
+            raise OSError(f"{path} est un lien symbolique, mise en quarantaine refusee")
+        ensure_private_dir(self.directory)
         item_id = uuid.uuid4().hex
-        path = Path(path).resolve()
-        (self.directory / f"{item_id}.bin").write_bytes(_xor(path.read_bytes()))
+        path = path.resolve()
+        blob = self.directory / f"{item_id}.bin"
+        with open(path, "rb") as src, _open_private(blob, 0) as dst:
+            while chunk := src.read(CHUNK):
+                dst.write(_xor(chunk))
         meta = {"original_path": str(path), "threat": threat, "date": time.time()}
-        (self.directory / f"{item_id}.json").write_text(json.dumps(meta), encoding="utf-8")
+        with _open_private(self.directory / f"{item_id}.json", 0) as fh:
+            fh.write(json.dumps(meta).encode("utf-8"))
         path.unlink()
         return item_id
 
@@ -44,18 +64,26 @@ class Quarantine:
         return items
 
     def restore(self, item_id: str) -> Path:
+        if not self.exists(item_id):
+            raise FileNotFoundError(f"Aucun element {item_id!r} en quarantaine")
         meta_file = self.directory / f"{item_id}.json"
         blob = self.directory / f"{item_id}.bin"
         meta = json.loads(meta_file.read_text(encoding="utf-8"))
         target = Path(meta["original_path"])
-        if target.exists():
+        if not target.is_absolute():
+            raise OSError(f"Emplacement d'origine invalide : {target}")
+        if target.exists() or target.is_symlink():
             raise FileExistsError(f"{target} existe deja, restauration annulee")
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(_xor(blob.read_bytes()))
+        with open(blob, "rb") as src, _open_private(target, 0) as dst:
+            while chunk := src.read(CHUNK):
+                dst.write(_xor(chunk))
         blob.unlink()
         meta_file.unlink()
         return target
 
     def delete(self, item_id: str) -> None:
+        if not item_id.isalnum():
+            raise FileNotFoundError(f"Aucun element {item_id!r} en quarantaine")
         for suffix in (".bin", ".json"):
             (self.directory / f"{item_id}{suffix}").unlink(missing_ok=True)

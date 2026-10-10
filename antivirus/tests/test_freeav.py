@@ -1,4 +1,7 @@
 import hashlib
+import json
+import os
+import stat
 import socket
 import struct
 import threading
@@ -119,3 +122,124 @@ def test_restore_does_not_overwrite_existing_file(sample_dir, tmp_path_factory):
         q.restore(item_id)
     assert infected.read_text() == "nouveau fichier"
     assert q.exists(item_id)
+
+
+# --- Sources open source : YARA et MalwareBazaar ---------------------------------
+
+from freeav import updater, yara_engine  # noqa: E402
+from freeav.clamav import ClamdError  # noqa: E402
+
+requires_yara = pytest.mark.skipif(not yara_engine.available(),
+                                   reason="yara-python non installe")
+
+
+@requires_yara
+def test_yara_rules_detect_and_bad_rules_are_isolated(tmp_path):
+    rules = tmp_path / "regles"
+    rules.mkdir()
+    (rules / "bon.yar").write_text(
+        'rule Faux_Rancongiciel { strings: $a = "VOS FICHIERS SONT CHIFFRES" condition: $a }')
+    (rules / "casse.yar").write_text("rule { ceci n'est pas du yara")
+    engine = yara_engine.YaraEngine([rules])
+    assert len(engine) == 1 and len(engine.rejected) == 1
+    (tmp_path / "note.txt").write_text("Bonjour, VOS FICHIERS SONT CHIFFRES, payez.")
+    (tmp_path / "sain.txt").write_text("rien a signaler")
+    report = Scanner(SignatureDB(), yara=engine).scan([tmp_path / "note.txt", tmp_path / "sain.txt"])
+    assert [(d.threat, d.engine) for d in report.detections] == [
+        ("YARA.Faux_Rancongiciel", "yara")]
+
+
+FEED = ("# MalwareBazaar recent malware samples (SHA256 hashes)\n"
+        "#\n" + hashlib.sha256(b"malware-a").hexdigest() + "\n"
+        + hashlib.sha256(b"malware-b").hexdigest() + "\n").encode()
+
+
+def test_update_writes_private_signature_file_used_by_scanner(tmp_path, monkeypatch):
+    monkeypatch.setattr(updater, "download", lambda url: FEED)
+    sig_dir = tmp_path / "signatures"
+    path, count = updater.update_malwarebazaar(directory=sig_dir)
+    assert count == 2
+    if os.name == "posix":
+        assert stat.S_IMODE(sig_dir.stat().st_mode) == 0o700
+    (tmp_path / "x.exe").write_bytes(b"malware-b")
+    report = Scanner(load_default(downloaded_dir=sig_dir)).scan([tmp_path / "x.exe"])
+    assert report.detections[0].threat == "MalwareBazaar.Malware"
+
+
+@pytest.mark.parametrize("feed", [
+    b"<html>page piegee</html>\n",
+    b"# vide\n",
+    FEED + b"sha256:abc:Injection\n",
+    "é".encode(),
+])
+def test_update_rejects_tampered_feed_and_keeps_old_db(tmp_path, monkeypatch, feed):
+    sig_dir = tmp_path / "signatures"
+    monkeypatch.setattr(updater, "download", lambda url: FEED)
+    updater.update_malwarebazaar(directory=sig_dir)
+    before = (sig_dir / "malwarebazaar.txt").read_text()
+    monkeypatch.setattr(updater, "download", lambda url: feed)
+    with pytest.raises(updater.UpdateError):
+        updater.update_malwarebazaar(directory=sig_dir)
+    assert (sig_dir / "malwarebazaar.txt").read_text() == before
+    assert [p.name for p in sig_dir.iterdir()] == ["malwarebazaar.txt"]
+
+
+def test_update_refuses_plain_http():
+    with pytest.raises(updater.UpdateError):
+        updater.download("http://bazaar.abuse.ch/export/txt/sha256/recent/")
+
+
+# --- Vie privee et protection des donnees ------------------------------------------
+
+def test_scan_never_uses_the_network(sample_dir, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("FreeAV a tente une connexion reseau pendant l'analyse")
+    monkeypatch.setattr(socket, "socket", forbidden)
+    monkeypatch.setattr(socket, "create_connection", forbidden)
+    report = Scanner(load_default()).scan([sample_dir])
+    assert len(report.detections) == 1
+
+
+def test_clamd_on_another_machine_is_refused_by_default():
+    with pytest.raises(ClamdError):
+        ClamdClient(host="203.0.113.5")
+    ClamdClient(host="203.0.113.5", allow_remote=True)
+    ClamdClient(host="::1")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="droits Unix")
+def test_quarantine_files_are_private(sample_dir, tmp_path_factory):
+    q = Quarantine(tmp_path_factory.mktemp("q") / "quarantaine")
+    item_id = q.isolate(sample_dir / "sous-dossier" / "eicar.com", "EICAR-Test-File")
+    assert stat.S_IMODE(q.directory.stat().st_mode) == 0o700
+    for suffix in (".bin", ".json"):
+        assert stat.S_IMODE((q.directory / f"{item_id}{suffix}").stat().st_mode) == 0o600
+
+
+@pytest.mark.skipif(os.name != "posix", reason="liens symboliques Unix")
+def test_quarantine_refuses_symlink_to_personal_file(tmp_path):
+    personal = tmp_path / "photos_perso.jpg"
+    personal.write_bytes(b"photo")
+    link = tmp_path / "piege.com"
+    link.symlink_to(personal)
+    q = Quarantine(tmp_path / "q")
+    with pytest.raises(OSError):
+        q.isolate(link, "Faux")
+    assert personal.read_bytes() == b"photo"
+
+
+def test_tampered_quarantine_record_cannot_write_elsewhere(sample_dir, tmp_path_factory):
+    q = Quarantine(tmp_path_factory.mktemp("q"))
+    item_id = q.isolate(sample_dir / "sous-dossier" / "eicar.com", "EICAR-Test-File")
+    victim = sample_dir / "sain.txt"
+    meta_file = q.directory / f"{item_id}.json"
+    meta = json.loads(meta_file.read_text())
+    meta["original_path"] = str(victim)  # tente d'ecraser un fichier existant
+    meta_file.write_text(json.dumps(meta))
+    with pytest.raises(FileExistsError):
+        q.restore(item_id)
+    assert victim.read_text() == "bonjour"
+    meta["original_path"] = "relatif/vers/ailleurs"
+    meta_file.write_text(json.dumps(meta))
+    with pytest.raises(OSError):
+        q.restore(item_id)

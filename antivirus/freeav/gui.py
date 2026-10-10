@@ -6,8 +6,9 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from . import __version__
+from . import __version__, updater
 from .clamav import ClamdClient
+from .cli import build_yara
 from .quarantine import Quarantine
 from .scanner import Scanner
 from .signatures import load_default
@@ -17,7 +18,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"FreeAV {__version__} - Antivirus gratuit")
-        self.geometry("760x480")
+        self.geometry("880x500")
         self.minsize(600, 380)
 
         self.quarantine = Quarantine()
@@ -48,6 +49,9 @@ class App(tk.Tk):
         ttk.Checkbutton(actions, text="Utiliser ClamAV (clamd)",
                         variable=self.use_clamav).pack(side="left", padx=12)
         ttk.Button(actions, text="Quarantaine...", command=self._show_quarantine).pack(side="right")
+        self.update_btn = ttk.Button(actions, text="Mettre a jour les signatures",
+                                     command=self._start_update)
+        self.update_btn.pack(side="right", padx=6)
 
         self.progress = ttk.Progressbar(self, mode="indeterminate")
         self.progress.pack(fill="x", padx=10, pady=8)
@@ -90,11 +94,25 @@ class App(tk.Tk):
             if not clamd.ping():
                 self.events.put(("warn", "clamd injoignable : signatures uniquement."))
                 clamd = None
-        scanner = Scanner(load_default(), clamd)
+        scanner = Scanner(load_default(), clamd, yara=build_yara([]))
         report = scanner.scan([target], exclude={self.quarantine.directory},
                               on_file=lambda p: self.events.put(("file", p)),
                               should_stop=self.stop_flag.is_set)
         self.events.put(("done", report))
+
+    def _start_update(self):
+        self.update_btn.config(state="disabled")
+        self.status.set("Telechargement des signatures MalwareBazaar...")
+
+        def work():
+            try:
+                _path, count = updater.update_malwarebazaar()
+                msg = f"{count} nouvelles signatures installees."
+            except (updater.UpdateError, OSError) as exc:
+                msg = f"Mise a jour impossible : {exc}"
+            self.events.put(("updated", msg))
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _poll(self):
         try:
@@ -106,6 +124,9 @@ class App(tk.Tk):
                     messagebox.showwarning("FreeAV", payload)
                 elif kind == "done":
                     self._finish(payload)
+                elif kind == "updated":
+                    self.update_btn.config(state="normal")
+                    self.status.set(payload)
         except queue.Empty:
             pass
         self.after(100, self._poll)

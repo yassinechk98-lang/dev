@@ -4,6 +4,7 @@ Utilise le protocole INSTREAM : le fichier est envoye par blocs au demon,
 qui repond "stream: OK" ou "stream: <Nom> FOUND".
 """
 
+import ipaddress
 import socket
 import struct
 from pathlib import Path
@@ -15,9 +16,23 @@ class ClamdError(Exception):
     pass
 
 
+def _is_loopback(host: str) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 class ClamdClient:
     def __init__(self, unix_socket: str | None = None, host: str = "127.0.0.1",
-                 port: int = 3310, timeout: float = 30.0):
+                 port: int = 3310, timeout: float = 30.0, allow_remote: bool = False):
+        # Protection de la vie privee : le contenu des fichiers est envoye a clamd,
+        # donc on refuse par defaut tout demon qui n'est pas sur cette machine.
+        if not unix_socket and not allow_remote and not _is_loopback(host):
+            raise ClamdError(f"clamd sur {host} n'est pas local : vos fichiers quitteraient "
+                             "l'ordinateur. Utilisez --allow-remote-clamd si c'est voulu.")
         self.unix_socket = unix_socket
         self.host = host
         self.port = port

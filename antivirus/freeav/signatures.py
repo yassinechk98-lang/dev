@@ -10,6 +10,8 @@ Cela permet de charger directement des bases de hachage ClamAV.
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .paths import SIGNATURES_DIR
+
 DEFAULT_DB = Path(__file__).parent / "data" / "signatures.txt"
 
 
@@ -52,9 +54,14 @@ class SignatureDB:
         return self.sha256.get(sha256) or self.md5.get(md5)
 
 
-def load_default(extra: list[Path] | None = None) -> SignatureDB:
+def load_default(extra: list[Path] | None = None,
+                 downloaded_dir: Path = SIGNATURES_DIR) -> SignatureDB:
+    """Base livree avec FreeAV + bases telechargees (freeav update) + bases passees en option."""
     db = SignatureDB()
     db.load_file(DEFAULT_DB)
+    if Path(downloaded_dir).is_dir():
+        for path in sorted(Path(downloaded_dir).glob("*.txt")):
+            db.load_file(path)
     for path in extra or []:
         db.load_file(path)
     return db
