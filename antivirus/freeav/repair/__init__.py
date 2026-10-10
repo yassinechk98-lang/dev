@@ -76,35 +76,35 @@ def check_undo_step(action: dict, backup_dir: Path) -> None:
 PROGRAMDATA_SCRIPT = r"""
 $ErrorActionPreference = 'Stop'
 $root = [Environment]::GetFolderPath('CommonApplicationData')
-$p = Join-Path $root 'FreeAV'
+$p = [IO.Path]::Combine($root, 'FreeAV')
 $trusted = 'S-1-5-32-544', 'S-1-5-18'
 $sid = [Security.Principal.SecurityIdentifier]
-if (Test-Path -LiteralPath $p) {
-  $item = Get-Item -LiteralPath $p -Force
-  $owner = (Get-Acl -LiteralPath $p).GetOwner($sid).Value
+if ([IO.Directory]::Exists($p) -or [IO.File]::Exists($p)) {
+  $item = [IO.DirectoryInfo]::new($p)
+  $owner = $item.GetAccessControl('Owner').GetOwner($sid).Value
   if (($trusted -notcontains $owner) -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
     # Dossier cree par quelqu'un d'autre : on le met de cote sans rien lire ni suivre dedans.
-    Rename-Item -LiteralPath $p -NewName ('FreeAV.non-sur-' + (Get-Date -Format 'yyyyMMddHHmmss'))
+    [IO.Directory]::Move($p, $p + '.non-sur-' + [DateTime]::Now.ToString('yyyyMMddHHmmss'))
   }
 }
-if (-not (Test-Path -LiteralPath $p)) { New-Item -ItemType Directory -Path $p | Out-Null }
-$acl = New-Object Security.AccessControl.DirectorySecurity
+$dir = [IO.Directory]::CreateDirectory($p)
+$acl = [Security.AccessControl.DirectorySecurity]::new()
 $acl.SetOwner([Security.Principal.SecurityIdentifier]'S-1-5-32-544')
 $acl.SetAccessRuleProtection($true, $false)
 foreach ($t in $trusted) {
-  $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+  $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
     [Security.Principal.SecurityIdentifier]$t, 'FullControl', 'ContainerInherit,ObjectInherit',
-    'None', 'Allow')))
+    'None', 'Allow'))
 }
-Set-Acl -LiteralPath $p -AclObject $acl
-$check = Get-Acl -LiteralPath $p
-if ($trusted -notcontains $check.GetOwner($sid).Value) { Write-Output 'ERREUR proprietaire'; exit 3 }
+$dir.SetAccessControl($acl)
+$check = ([IO.DirectoryInfo]::new($p)).GetAccessControl()
+if ($trusted -notcontains $check.GetOwner($sid).Value) { 'ERREUR proprietaire'; exit 3 }
 foreach ($rule in $check.GetAccessRules($true, $true, $sid)) {
   if ($rule.AccessControlType -eq 'Allow' -and $trusted -notcontains $rule.IdentityReference.Value) {
-    Write-Output ('ERREUR acces ' + $rule.IdentityReference.Value); exit 4
+    ('ERREUR acces ' + $rule.IdentityReference.Value); exit 4
   }
 }
-Write-Output ('OK ' + $p)
+'OK ' + $p
 """
 
 

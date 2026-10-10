@@ -433,17 +433,18 @@ def test_real_windows_protected_backup_folder():
     folder = root.parent
     assert folder.is_dir()
     acl = subprocess.run(["powershell", "-NoProfile", "-Command",
-                          f"(Get-Acl -LiteralPath '{folder}').Access | ForEach-Object "
-                          "{ $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value }"],
+                          f"([IO.DirectoryInfo]::new('{folder}')).GetAccessControl().GetAccessRules("
+                          "$true, $true, [Security.Principal.SecurityIdentifier]) | "
+                          "ForEach-Object { $_.IdentityReference.Value }"],
                          capture_output=True, text=True, check=True).stdout.split()
     assert set(acl) <= {"S-1-5-32-544", "S-1-5-18"}, acl
 
     root.mkdir(exist_ok=True)
     (root / "20990101-000000-dead.json").write_text('{"steps": []}', encoding="utf-8")
     subprocess.run(["powershell", "-NoProfile", "-Command",
-                    f"$a = Get-Acl -LiteralPath '{folder}'; "
+                    f"$d = [IO.DirectoryInfo]::new('{folder}'); $a = $d.GetAccessControl(); "
                     "$a.SetOwner([Security.Principal.WindowsIdentity]::GetCurrent().User); "
-                    f"Set-Acl -LiteralPath '{folder}' -AclObject $a"], check=True)
+                    "$d.SetAccessControl($a)"], check=True)
     root2 = repair.admin_backup_root(system)
     assert root2 == root
     assert not (root / "20990101-000000-dead.json").exists()

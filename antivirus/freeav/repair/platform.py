@@ -106,6 +106,11 @@ def _run(args: list[str], timeout: float) -> subprocess.CompletedProcess:
     kwargs = {}
     if IS_WINDOWS:
         kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        if args and Path(args[0]).stem.lower() == "powershell":
+            # Lance depuis PowerShell 7, Windows PowerShell 5 herite de modules incompatibles
+            env = dict(os.environ)
+            env.pop("PSModulePath", None)
+            kwargs["env"] = env
     return subprocess.run(args, capture_output=True, text=True, timeout=timeout,
                           encoding="utf-8", errors="replace", **kwargs)
 
