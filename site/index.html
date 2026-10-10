@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FreeAV – Antivirus gratuit et open source</title>
-<meta name="description" content="FreeAV est un antivirus gratuit et open source basé sur les signatures ClamAV. Analysez vos fichiers sans publicité ni abonnement.">
+<meta name="description" content="FreeAV est un antivirus gratuit et open source pour Windows : détection par signatures, protection en temps réel et réparation du PC. Sans publicité ni abonnement.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 2 4 7v8c0 7.5 5.1 13.4 12 15 6.9-1.6 12-7.5 12-15V7z' fill='%2316a34a'/><path d='m11 16 4 4 7-8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <script>document.documentElement.classList.add('js')</script>
 <style>
@@ -160,6 +160,42 @@ details p{color:var(--muted);margin:10px 0 0}
 details[open] p{animation:fadeDown .35s ease}
 footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font-size:14px;text-align:center}
 
+/* Protection en temps réel et automatique */
+.prot-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+.prot{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease}
+.prot:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 16px 32px -20px var(--shadow)}
+.prot:hover .icon{animation:wiggle .55s ease}
+.prot-head{display:flex;align-items:center;gap:12px}
+.prot-head h3{margin:0;font-size:20px}
+.prot > p{color:var(--muted);font-size:15px;margin:12px 0 0}
+.prot > p strong{color:var(--text)}
+.prot .prot-small{font-size:14px}
+.mini{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-top:16px}
+.mini-top{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:6px}
+.live{position:relative;flex:none;width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.live::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);animation:ring 1.8s ease-out infinite}
+.clock{flex:none;width:16px;height:16px;fill:none;stroke:var(--accent-strong);stroke-width:2;stroke-linecap:round}
+.rt-list,.auto-list{list-style:none;padding:0;margin:0}
+.rt-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);transition:opacity .35s ease,transform .35s ease}
+.js .rt-list li{opacity:0;transform:translateY(-8px)}
+.js .rt-list li.in{opacity:1;transform:none}
+.rt-list .f{min-width:0;font:13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .3s}
+.rt-list li.bad{animation:shake .45s ease}
+.rt-list li.gone .f{color:var(--muted);text-decoration:line-through}
+.st{flex:none;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;transition:background .3s,color .3s}
+.st.wait{color:var(--muted);background:var(--surface);border:1px solid var(--border)}
+.st.ok{color:var(--accent-strong);background:var(--accent-soft)}
+.st.danger{color:var(--danger);background:var(--danger-soft)}
+.rt-alert{border-radius:10px;background:var(--danger-soft);color:var(--danger);font-size:14px;font-weight:600;margin-top:10px;padding:8px 12px;overflow:hidden;max-height:60px;transition:max-height .4s ease,opacity .4s ease,margin .4s ease,padding .4s ease}
+.js .rt-demo:not(.alert) .rt-alert{max-height:0;opacity:0;margin-top:0;padding-top:0;padding-bottom:0}
+.auto-list li{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start;padding:7px 0;font-size:14px}
+.auto-list li::before{content:"";width:18px;height:18px;margin-top:2px;border-radius:50%;border:2px solid var(--border);box-sizing:border-box;transition:background-color .3s,border-color .3s}
+.auto-list li.run::before{border-color:var(--accent);border-top-color:transparent;animation:spin .8s linear infinite}
+.auto-list li.done::before{border-color:var(--accent);background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8.5 2.5 2.5L12 5.5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat}
+.auto-list small{display:block;color:var(--muted);font-size:12px}
+.auto-foot{display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;color:var(--text);transition:opacity .4s}
+.js .auto-demo:not(.all) .auto-foot{opacity:.35}
+
 /* Réparer mon PC */
 .center{text-align:center;margin:0 0 6px}
 .repair-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
@@ -203,6 +239,7 @@ footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font
 .steps > :nth-child(2),details:nth-of-type(2){--d:.12s}
 .steps > :nth-child(3),details:nth-of-type(3),.checks > :nth-child(3){--d:.24s}
 .steps > :nth-child(4),details:nth-of-type(4),.checks > :nth-child(4){--d:.36s}
+.steps > :nth-child(5){--d:.48s}
 details:nth-of-type(5),.checks > :nth-child(5){--d:.48s}
 details:nth-of-type(6){--d:.6s}
 .checks > :nth-child(2){--d:.12s}
@@ -225,10 +262,12 @@ details:nth-of-type(6){--d:.6s}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
 @keyframes spin-border{to{--angle:360deg}}
+@keyframes spin{to{transform:rotate(360deg)}}
 @keyframes ssMore{0%,45%{outline-color:#fff}50%,100%{outline-color:transparent}}
 @keyframes ssRun{0%,45%{opacity:.35;outline-color:transparent}50%,95%{opacity:1;outline-color:#fff}100%{opacity:.35;outline-color:transparent}}
 
-@media (max-width:760px){nav{display:none}.repair-grid,.smartscreen{grid-template-columns:1fr}.ss-mock{max-width:320px;width:100%;margin:0 auto}}
+@media (max-width:860px){nav{display:none}}
+@media (max-width:760px){.repair-grid,.smartscreen,.prot-grid{grid-template-columns:1fr}.ss-mock{max-width:320px;width:100%;margin:0 auto}}
 @media (max-width:560px){.hero{padding:44px 0 40px}.scan-demo{margin-top:32px}.rd-list li{font-size:13px}.rd-title{white-space:normal;line-height:1.35}.sev{min-width:0}}
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
@@ -246,6 +285,7 @@ details:nth-of-type(6){--d:.6s}
     </a>
     <nav>
       <a href="#fonctionnalites">Fonctionnalités</a>
+      <a href="#protection">Protection</a>
       <a href="#reparer">Réparer mon PC</a>
       <a href="#comment">Comment ça marche</a>
       <a href="#telecharger">Télécharger</a>
@@ -271,7 +311,7 @@ details:nth-of-type(6){--d:.6s}
       </div>
       <span class="badge">100 % gratuit · Open source</span>
       <h1>Protégez votre ordinateur,<br><span class="grad">sans payer un centime.</span></h1>
-      <p class="lead">FreeAV analyse vos fichiers, détecte les virus grâce aux signatures ClamAV mises à jour chaque jour, et vous aide à réparer les problèmes qu'ils laissent sur votre PC. Pas de publicité, pas d'abonnement, pas de collecte de données.</p>
+      <p class="lead">FreeAV détecte les malwares connus grâce à leurs signatures, surveille vos téléchargements en temps réel et vous aide à réparer les problèmes qu'ils laissent sur votre PC. Pas de publicité, pas d'abonnement, pas de collecte de données.</p>
       <div class="ctas">
         <a class="btn btn-primary shine dl-link" href="https://github.com/yassinechk98-lang/dev/releases/download/freeav-test/FreeAV.exe"><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Télécharger pour Windows</a>
         <a class="btn btn-ghost" href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener">Voir le code source</a>
@@ -306,7 +346,7 @@ details:nth-of-type(6){--d:.6s}
         <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></div>
           <h3>Signatures à jour</h3>
-          <p>Base de signatures ClamAV mise à jour automatiquement chaque jour.</p>
+          <p>Les empreintes des nouveaux malwares publiées par MalwareBazaar, ajoutées chaque jour (clé gratuite abuse.ch).</p>
         </div>
         <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
@@ -329,6 +369,51 @@ details:nth-of-type(6){--d:.6s}
           <p>Le code est public : chacun peut le vérifier et l'améliorer.</p>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section id="protection">
+    <div class="wrap">
+      <p class="center reveal"><span class="badge">Nouveau</span></p>
+      <h2 class="reveal">Une protection qui veille pour vous</h2>
+      <p class="sub reveal">Deux réglages dans FreeAV, et votre PC est surveillé sans que vous ayez à y penser.</p>
+      <div class="prot-grid">
+        <article class="prot reveal">
+          <div class="prot-head">
+            <div class="icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
+            <h3>Protection en temps réel</h3>
+          </div>
+          <p>Cochez la case dans FreeAV : il surveille vos dossiers <strong>Téléchargements</strong> et <strong>Bureau</strong> et analyse chaque nouveau fichier dès qu'il est entièrement écrit. Une menace confirmée part aussitôt en quarantaine et une alerte s'affiche. Un fichier seulement suspect est signalé, sans être déplacé.</p>
+          <div class="mini rt-demo" id="rtDemo" role="img" aria-label="Démonstration animée : trois fichiers arrivent dans Téléchargements, FreeAV les analyse et met le fichier de test en quarantaine.">
+            <div class="mini-top"><span class="live"></span><span>Surveillance active · Téléchargements, Bureau</span></div>
+            <ul class="rt-list">
+              <li><span class="f">facture_mars.pdf</span><span class="st ok">Sain</span></li>
+              <li><span class="f">photo_vacances.jpg</span><span class="st ok">Sain</span></li>
+              <li class="gone"><span class="f">eicar_test.com</span><span class="st danger">En quarantaine</span></li>
+            </ul>
+            <div class="rt-alert"><span aria-hidden="true">⚠</span> FreeAV a bloqué eicar_test.com</div>
+          </div>
+        </article>
+        <article class="prot reveal">
+          <div class="prot-head">
+            <div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+            <h3>Protection automatique</h3>
+          </div>
+          <p>Un clic sur le bouton suffit, <strong>sans droits administrateur</strong>. Ensuite, FreeAV s'occupe de tout, chaque jour :</p>
+          <div class="mini auto-demo" id="autoDemo" role="img" aria-label="Démonstration animée : chaque jour, FreeAV met à jour ses signatures, analyse Téléchargements et Bureau, contrôle les points sensibles du PC et alerte en cas de problème.">
+            <div class="mini-top"><svg class="clock" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Tâche quotidienne de FreeAV</span></div>
+            <ul class="auto-list">
+              <li class="done"><span>Mise à jour des signatures<small>si une clé abuse.ch gratuite est enregistrée</small></span></li>
+              <li class="done"><span>Analyse de Téléchargements et Bureau</span></li>
+              <li class="done"><span>Contrôle des points sensibles du PC</span></li>
+              <li class="done"><span>Alerte si quelque chose ne va pas</span></li>
+            </ul>
+            <div class="auto-foot"><span class="live"></span><span>Et à chaque ouverture de session, la protection en temps réel démarre.</span></div>
+          </div>
+          <p class="prot-small">Le bouton « Tout retirer » enlève tout en un clic. L'installation et le retrait ont été testés sur un vrai PC Windows.</p>
+        </article>
+      </div>
+      <p class="beta reveal"><strong>Ce que la protection en temps réel ne fait pas.</strong> Elle vérifie les fichiers juste après leur arrivée dans Téléchargements et Bureau. Elle ne surveille pas tout le disque et n'empêche pas l'ouverture d'un fichier comme le pilote d'un antivirus payant. Gardez Microsoft Defender activé : FreeAV vient en complément.</p>
     </div>
   </section>
 
@@ -411,6 +496,7 @@ details:nth-of-type(6){--d:.6s}
       <p class="sub reveal">Quelques étapes, et vous êtes protégé.</p>
       <ol class="steps">
         <li class="reveal"><strong>Téléchargez FreeAV.exe et ouvrez-le.</strong><br><span style="color:var(--muted)">Gratuit, sans inscription : un double-clic suffit.</span></li>
+        <li class="reveal"><strong>Activez la protection.</strong><br><span style="color:var(--muted)">Cochez « Protection en temps réel » et cliquez sur « Protection automatique ».</span></li>
         <li class="reveal"><strong>Lancez une analyse.</strong><br><span style="color:var(--muted)">Depuis l'interface graphique ou en ligne de commande (<code>python -m freeav scan</code>).</span></li>
         <li class="reveal"><strong>Gérez les menaces détectées.</strong><br><span style="color:var(--muted)">Mettez-les en quarantaine ou supprimez-les en un clic.</span></li>
         <li class="reveal"><strong>Réparez votre PC si besoin.</strong><br><span style="color:var(--muted)">Avec « Réparer mon PC » : un diagnostic d'abord, puis seulement les réparations que vous choisissez.</span></li>
@@ -455,8 +541,8 @@ details:nth-of-type(6){--d:.6s}
       <h2 class="reveal">Questions fréquentes</h2>
       <p class="sub reveal">Ce qu'on nous demande le plus souvent.</p>
       <details class="reveal"><summary>FreeAV est-il vraiment gratuit ?</summary><p>Oui. Pas de version premium, pas de publicité, pas d'abonnement caché.</p></details>
-      <details class="reveal"><summary>Comment FreeAV détecte-t-il les virus ?</summary><p>FreeAV compare vos fichiers à la base de signatures ClamAV, un moteur antivirus open source reconnu et mis à jour quotidiennement.</p></details>
-      <details class="reveal"><summary>FreeAV remplace-t-il Windows Defender ?</summary><p>FreeAV est un outil d'analyse complémentaire. Nous recommandons de garder la protection intégrée de votre système activée.</p></details>
+      <details class="reveal"><summary>Comment FreeAV détecte-t-il les virus ?</summary><p>FreeAV compare l'empreinte de vos fichiers à une base de malwares connus, enrichie chaque jour par la base publique MalwareBazaar (avec une clé gratuite abuse.ch). Il peut aussi utiliser des règles YARA open source et le moteur ClamAV, s'ils sont installés.</p></details>
+      <details class="reveal"><summary>FreeAV remplace-t-il Windows Defender ?</summary><p>Non, il le complète. La protection en temps réel de FreeAV surveille Téléchargements et Bureau et vérifie les fichiers juste après leur arrivée, mais elle n'empêche pas l'ouverture d'un fichier comme le fait Microsoft Defender. Gardez Defender activé.</p></details>
       <details class="reveal"><summary>Mes fichiers sont-ils envoyés sur Internet ?</summary><p>Non. L'analyse se fait entièrement en local. Seules les mises à jour de signatures sont téléchargées.</p></details>
       <details class="reveal"><summary>« Réparer mon PC » peut-il abîmer mon ordinateur ?</summary><p>Le diagnostic ne modifie rien. Ensuite, FreeAV ne répare que ce que vous choisissez et sauvegarde chaque modification pour pouvoir l'annuler. Le nettoyage des fichiers temporaires et les outils Windows ne s'annulent pas : c'est indiqué avant de les lancer. La fonction est encore en test, gardez une sauvegarde de vos fichiers importants.</p></details>
       <details class="reveal"><summary>Pourquoi Windows affiche-t-il un avertissement ?</summary><p>FreeAV n'est pas encore signé numériquement, et Windows SmartScreen se méfie des applications qu'il ne connaît pas encore. Cliquez sur « Informations complémentaires » puis sur « Exécuter quand même ». Pour vérifier que votre fichier est bien l'original, comparez-le avec l'<a href="https://github.com/yassinechk98-lang/dev/releases/download/freeav-test/FreeAV.exe.sha256">empreinte SHA-256</a> publiée.</p></details>
@@ -505,6 +591,63 @@ details:nth-of-type(6){--d:.6s}
       });
     }, {threshold:0.15, rootMargin:'0px 0px -40px 0px'});
     items.forEach(function(el){ io.observe(el); });
+  }
+
+  // Lance une démo quand elle devient visible (ou affiche son état final)
+  function startWhenVisible(el, cycle, showFinal){
+    if (reduce || !('IntersectionObserver' in window)) { showFinal(); return; }
+    var obs = new IntersectionObserver(function(entries){
+      if (entries[0].isIntersecting) { obs.disconnect(); cycle(); }
+    }, {threshold:0.3});
+    obs.observe(el);
+  }
+
+  // Démo « Protection en temps réel » : des fichiers arrivent et sont analysés
+  var rt = document.getElementById('rtDemo');
+  if (rt) {
+    var rtRows = rt.querySelectorAll('.rt-list li');
+    var setSt = function(li, cls, text){ var st = li.querySelector('.st'); st.className = 'st ' + cls; st.textContent = text; };
+    var rtFinal = function(){
+      rtRows.forEach(function(li){ li.classList.add('in'); });
+      setSt(rtRows[0], 'ok', 'Sain'); setSt(rtRows[1], 'ok', 'Sain');
+      rtRows[2].classList.add('gone'); setSt(rtRows[2], 'danger', 'En quarantaine');
+      rt.classList.add('alert');
+    };
+    var rtCycle = function(){
+      rt.classList.remove('alert');
+      rtRows.forEach(function(li){ li.classList.remove('in', 'bad', 'gone'); setSt(li, 'wait', 'Analyse…'); });
+      [0, 1, 2].forEach(function(i){
+        var t = 500 + i * 1300;
+        setTimeout(function(){ rtRows[i].classList.add('in'); }, t);
+        if (i < 2) setTimeout(function(){ setSt(rtRows[i], 'ok', 'Sain'); }, t + 800);
+      });
+      setTimeout(function(){ rtRows[2].classList.add('bad'); setSt(rtRows[2], 'danger', 'Menace'); }, 3900);
+      setTimeout(function(){ rtRows[2].classList.add('gone'); setSt(rtRows[2], 'danger', 'En quarantaine'); rt.classList.add('alert'); }, 4800);
+      setTimeout(rtCycle, 9000);
+    };
+    startWhenVisible(rt, rtCycle, rtFinal);
+  }
+
+  // Démo « Protection automatique » : les tâches du jour se cochent une à une
+  var auto = document.getElementById('autoDemo');
+  if (auto) {
+    var autoRows = auto.querySelectorAll('.auto-list li');
+    var autoFinal = function(){
+      autoRows.forEach(function(li){ li.classList.remove('run'); li.classList.add('done'); });
+      auto.classList.add('all');
+    };
+    var autoCycle = function(){
+      auto.classList.remove('all');
+      autoRows.forEach(function(li){ li.classList.remove('run', 'done'); });
+      autoRows.forEach(function(li, i){
+        var t = 600 + i * 1200;
+        setTimeout(function(){ li.classList.add('run'); }, t);
+        setTimeout(function(){ li.classList.remove('run'); li.classList.add('done'); }, t + 900);
+      });
+      setTimeout(function(){ auto.classList.add('all'); }, 600 + autoRows.length * 1200);
+      setTimeout(autoCycle, 600 + autoRows.length * 1200 + 4000);
+    };
+    startWhenVisible(auto, autoCycle, autoFinal);
   }
 
   // Démo « Réparer mon PC » : diagnostic puis réparations, en boucle
