@@ -73,7 +73,10 @@ if ($r.ReturnValue -ne 0) { throw "Win32_Process.Create : $($r.ReturnValue)" }
 
 def self_delete_command(exe: Path) -> str:
     import base64
-    script = SELF_DELETE_SCRIPT.format(exe=str(exe).replace("'", "''"))
+    path = str(exe)
+    for quote in "'\u2018\u2019\u201a\u201b":  # PowerShell lit aussi ces apostrophes typographiques
+        path = path.replace(quote, quote * 2)
+    script = SELF_DELETE_SCRIPT.format(exe=path)
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     return ("powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden "
             f"-EncodedCommand {encoded}")

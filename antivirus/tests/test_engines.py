@@ -272,6 +272,8 @@ def test_self_delete_command_cannot_be_broken_by_the_profile_path():
     assert "&" not in command and "^" not in command and "'" not in command
     script = base64.b64decode(encoded).decode("utf-16-le")
     assert "$exe = 'C:\\Users\\Jean & Marie''s ^PC\\AppData" in script
+    curly = installer.self_delete_command(Path("C:\\Users\\Jean\u2019s\\FreeAV.exe"))
+    assert "Jean\u2019\u2019s" in base64.b64decode(curly.rsplit(" ", 1)[1]).decode("utf-16-le")
 
 
 def test_right_click_on_a_drive_keeps_the_drive_path():
