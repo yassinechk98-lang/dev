@@ -63,11 +63,23 @@ jobs:
           Set-Content -NoNewline essai/faux_virus.bin "fichier de test FreeAV"
           $hash = (Get-FileHash essai/faux_virus.bin -Algorithm SHA256).Hash.ToLower()
           Set-Content base.txt "sha256:${hash}:Test.FreeAV"
-          $p = Start-Process dist/FreeAV.exe -ArgumentList "scan", "essai", "--db", "base.txt" -Wait -PassThru
-          if ($p.ExitCode -ne 1) { throw "detection attendue (code 1), obtenu $($p.ExitCode)" }
+          function Lance-FreeAV {
+            $p = Start-Process dist/FreeAV.exe -ArgumentList "scan", "essai", "--db", "base.txt" `
+              -Wait -PassThru -RedirectStandardOutput sortie.txt -RedirectStandardError erreurs.txt
+            Get-Content sortie.txt, erreurs.txt
+            Write-Host "code de sortie : $($p.ExitCode)"
+            return $p.ExitCode
+          }
+          function Echec($message) {
+            $sortie = ((Get-Content sortie.txt, erreurs.txt -Raw -ErrorAction SilentlyContinue) -join "`n") -replace "`r", "" -replace "`n", "%0A"
+            Write-Host "::error title=FreeAV.exe::$message%0A$sortie"
+            exit 1
+          }
+          $code = Lance-FreeAV
+          if ($code[-1] -ne 1) { Echec "detection attendue (code 1), obtenu $($code[-1])" }
           Remove-Item essai/faux_virus.bin
-          $p = Start-Process dist/FreeAV.exe -ArgumentList "scan", "essai", "--db", "base.txt" -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "aucune menace attendue (code 0), obtenu $($p.ExitCode)" }
+          $code = Lance-FreeAV
+          if ($code[-1] -ne 0) { Echec "aucune menace attendue (code 0), obtenu $($code[-1])" }
           (Get-FileHash dist/FreeAV.exe -Algorithm SHA256).Hash.ToLower() + "  FreeAV.exe" | Set-Content dist/FreeAV.exe.sha256
 
       - uses: actions/upload-artifact@v4
