@@ -60,7 +60,7 @@ def _snapshot(folders: list[Path], exclude: set[Path]) -> dict[Path, tuple]:
                         stack.append((path, depth + 1))
                 elif entry.is_file(follow_symlinks=False):
                     st = entry.stat(follow_symlinks=False)
-                    state[path] = (st.st_size, st.st_mtime_ns, st.st_ino, st.st_ctime_ns)
+                    state[path] = (st.st_size, st.st_mtime_ns, entry.inode(), st.st_ctime_ns)
             except OSError:
                 continue
     return state
