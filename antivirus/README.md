@@ -47,8 +47,12 @@ python -m freeav repair --fix-dangers        # reparer tout ce qui est marque DA
 python -m freeav repair --undo               # annuler la derniere reparation
 ```
 
-Chaque modification est sauvegardee dans `~/.freeav/repair-backups` et peut etre annulee, sauf le
-nettoyage des fichiers temporaires et les outils Windows (signales "definitif"). Sous Windows, un
+Les modifications du registre, du fichier hosts, du dossier Demarrage et des taches planifiees sont
+sauvegardees dans `~/.freeav/repair-backups` et peuvent etre annulees.
+
+**Attention : deux types d'actions sont definitifs et ne peuvent pas etre annules** : le nettoyage des
+fichiers temporaires (les fichiers sont supprimes) et les outils Windows SFC, DISM et vidage du cache
+DNS. FreeAV les signale "DEFINITIF" et demande une confirmation (`--yes` en ligne de commande). Sous Windows, un
 point de restauration systeme est cree avant de reparer si FreeAV est lance en administrateur,
 ce qui est necessaire pour les reglages communs a tout le PC (HKLM, hosts, Defender, SFC).
 

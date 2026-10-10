@@ -267,3 +267,15 @@ def test_cli_repair_lists_and_fixes_by_id(pc, monkeypatch, capsys, tmp_path):
     assert main(["repair", "--fix", updater_id]) == 0
     assert system.registry.get("HKCU", RUN, "Updater") is None
     assert main(["repair", "--fix", "inconnu0"]) == 2
+
+
+def test_cli_requires_confirmation_for_irreversible_actions(pc, monkeypatch, capsys, tmp_path):
+    system, _ = pc
+    monkeypatch.setattr(repair, "System", lambda: system)
+    monkeypatch.setattr("freeav.cli.malware_checker", lambda scanner=None: is_malware)
+    dns = {f.title: f for f in repair.diagnose(system, is_malware)}["Vider le cache DNS"]
+    assert main(["repair", "--fix", dns.id]) == 2
+    assert "DEFINITIVES" in capsys.readouterr().err
+    assert ["ipconfig", "/flushdns"] not in system.runner.calls
+    assert main(["repair", "--fix", dns.id, "--yes"]) == 0
+    assert system.runner.calls[-1] == ["ipconfig", "/flushdns"]

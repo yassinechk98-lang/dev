@@ -320,9 +320,15 @@ class RepairWindow(tk.Toplevel):
                                 "reparables dans la liste.", parent=self)
             return
         text = "\n".join(f"- {f.title} : {f.fix_label}"
-                         + ("" if f.undoable else " (definitif)") for f in chosen)
-        if not messagebox.askyesno("Reparer mon PC", f"FreeAV va effectuer :\n{text}\n\n"
-                                   "Les modifications sont sauvegardees. Continuer ?", parent=self):
+                         + ("" if f.undoable else " (DEFINITIF)") for f in chosen)
+        final = [f for f in chosen if not f.undoable]
+        warning = ("\n\nAttention : les actions marquees DEFINITIF ne pourront pas etre "
+                   "annulees (fichiers temporaires supprimes, outils Windows)." if final else "")
+        undoable = "Les autres modifications sont sauvegardees et annulables." if final else \
+            "Toutes ces modifications sont sauvegardees et annulables."
+        if not messagebox.askyesno("Reparer mon PC", f"FreeAV va effectuer :\n{text}{warning}"
+                                   f"\n\n{undoable} Continuer ?",
+                                   icon="warning" if final else "question", parent=self):
             return
         self.fix_btn.config(state="disabled")
         self.status.set("Reparation en cours...")

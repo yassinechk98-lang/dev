@@ -180,6 +180,12 @@ def cmd_repair(args) -> int:
     if not chosen:
         print("Rien a reparer.")
         return 0
+    final = [f for f in chosen if not f.undoable]
+    if final and not args.yes:
+        print("Ces actions sont DEFINITIVES et ne pourront pas etre annulees :\n"
+              + "\n".join(f"  - {f.title} : {f.fix_label}" for f in final)
+              + "\nRelancez avec --yes pour confirmer.", file=sys.stderr)
+        return 2
     if repair.create_restore_point(system):
         print("Point de restauration Windows cree.")
     results, journal = repair.apply_fixes(chosen, system)
@@ -246,6 +252,8 @@ def main(argv: list[str] | None = None) -> int:
     rep.add_argument("--undo", nargs="?", const="", metavar="SAUVEGARDE",
                      help="annuler la derniere reparation (ou celle indiquee)")
     rep.add_argument("--list-backups", action="store_true", help="lister les sauvegardes")
+    rep.add_argument("--yes", action="store_true",
+                     help="confirmer les actions definitives (nettoyage, outils Windows)")
     rep.set_defaults(func=cmd_repair)
 
     gui = sub.add_parser("gui", help="ouvrir l'interface graphique")
