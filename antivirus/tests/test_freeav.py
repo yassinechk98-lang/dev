@@ -93,3 +93,24 @@ def test_clamd_client_parses_found_reply(tmp_path):
     assert client.scan_file(f) == "Win.Test.Fake"
     thread.join()
     server.close()
+
+
+def test_cli_rejects_missing_path(tmp_path, capsys):
+    assert main(["--quarantine-dir", str(tmp_path), "scan", str(tmp_path / "absent")]) == 2
+    assert "introuvable" in capsys.readouterr().err
+
+
+def test_cli_rejects_unknown_quarantine_id(tmp_path, capsys):
+    assert main(["--quarantine-dir", str(tmp_path), "quarantine", "--restore", "abc"]) == 2
+    assert main(["--quarantine-dir", str(tmp_path), "quarantine", "--delete", "../x"]) == 2
+
+
+def test_restore_does_not_overwrite_existing_file(sample_dir, tmp_path_factory):
+    q = Quarantine(tmp_path_factory.mktemp("q"))
+    infected = sample_dir / "sous-dossier" / "eicar.com"
+    item_id = q.isolate(infected, "EICAR-Test-File")
+    infected.write_text("nouveau fichier")
+    with pytest.raises(FileExistsError):
+        q.restore(item_id)
+    assert infected.read_text() == "nouveau fichier"
+    assert q.exists(item_id)

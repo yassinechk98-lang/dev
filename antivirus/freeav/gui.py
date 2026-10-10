@@ -121,13 +121,18 @@ class App(tk.Tk):
         self.status.set(f"{report.scanned} fichiers analyses. {verdict}")
 
     def _quarantine_selected(self):
+        moved = 0
         for item in self.tree.selection():
             threat, _engine, path = self.tree.item(item, "values")
             try:
                 self.quarantine.isolate(Path(path), threat)
                 self.tree.delete(item)
+                moved += 1
             except OSError as exc:
                 messagebox.showerror("FreeAV", f"Echec pour {path} :\n{exc}")
+        if moved:
+            self.status.set(f"{moved} fichier(s) mis en quarantaine, "
+                            f"{len(self.tree.get_children())} menace(s) restante(s).")
 
     def _show_quarantine(self):
         win = tk.Toplevel(self)
@@ -148,7 +153,10 @@ class App(tk.Tk):
 
         def act(fn):
             for item_id in tree.selection():
-                fn(item_id)
+                try:
+                    fn(item_id)
+                except OSError as exc:
+                    messagebox.showerror("FreeAV", str(exc), parent=win)
             refresh()
 
         buttons = ttk.Frame(win, padding=(10, 0, 10, 10))

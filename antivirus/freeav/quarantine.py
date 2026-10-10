@@ -31,6 +31,11 @@ class Quarantine:
         path.unlink()
         return item_id
 
+    def exists(self, item_id: str) -> bool:
+        return (item_id.isalnum()
+                and (self.directory / f"{item_id}.json").is_file()
+                and (self.directory / f"{item_id}.bin").is_file())
+
     def list(self) -> list[dict]:
         items = []
         for meta_file in sorted(self.directory.glob("*.json")):
@@ -43,6 +48,8 @@ class Quarantine:
         blob = self.directory / f"{item_id}.bin"
         meta = json.loads(meta_file.read_text(encoding="utf-8"))
         target = Path(meta["original_path"])
+        if target.exists():
+            raise FileExistsError(f"{target} existe deja, restauration annulee")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(_xor(blob.read_bytes()))
         blob.unlink()

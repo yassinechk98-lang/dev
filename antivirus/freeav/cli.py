@@ -25,6 +25,10 @@ def build_scanner(args) -> Scanner:
 
 
 def cmd_scan(args) -> int:
+    missing = [p for p in args.paths if not Path(p).exists()]
+    if missing:
+        print(f"Erreur : chemin introuvable : {', '.join(missing)}", file=sys.stderr)
+        return 2
     scanner = build_scanner(args)
     quarantine = Quarantine(Path(args.quarantine_dir))
     print(f"FreeAV {__version__} : {len(scanner.db)} signatures chargees"
@@ -47,8 +51,16 @@ def cmd_scan(args) -> int:
 
 def cmd_quarantine(args) -> int:
     quarantine = Quarantine(Path(args.quarantine_dir))
+    item_id = args.restore or args.delete
+    if item_id and not quarantine.exists(item_id):
+        print(f"Erreur : aucun element {item_id!r} en quarantaine.", file=sys.stderr)
+        return 2
     if args.restore:
-        print(f"Restaure : {quarantine.restore(args.restore)}")
+        try:
+            print(f"Restaure : {quarantine.restore(args.restore)}")
+        except FileExistsError as exc:
+            print(f"Erreur : {exc}", file=sys.stderr)
+            return 2
     elif args.delete:
         quarantine.delete(args.delete)
         print("Supprime definitivement.")
