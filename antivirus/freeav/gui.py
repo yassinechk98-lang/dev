@@ -8,14 +8,19 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from . import __version__, schedule, updater, watcher
 from .clamav import ClamdClient
-from .cli import build_yara, malware_checker, scan_exclusions
+from .cli import batch_engines, build_yara, malware_checker, scan_exclusions
 from .quarantine import Quarantine
 from .scanner import Scanner
 from .signatures import load_default
 
 
+ENGINE_LABELS = {"clamav": "ClamAV integre", "defender": "Microsoft Defender"}
+COLORS = {"ok": ("#e6f4ea", "#1b6e2d"), "warn": ("#fff4e5", "#8a4b00"),
+          "danger": ("#fdecea", "#a1251b")}
+
+
 class App(tk.Tk):
-    def __init__(self):
+    def __init__(self, scan: str | None = None):
         super().__init__()
         self.title(f"FreeAV {__version__} - Antivirus gratuit")
         icon = Path(__file__).parent / "data" / "freeav.ico"  # ajoutee par la version Windows
@@ -31,17 +36,47 @@ class App(tk.Tk):
         self.events: queue.Queue = queue.Queue()
         self.stop_flag = threading.Event()
         self.worker: threading.Thread | None = None
-        self.target = tk.StringVar(value=str(Path.home() / "Downloads"))
+        self.target = tk.StringVar(value=scan or str(Path.home() / "Downloads"))
         self.use_clamav = tk.BooleanVar(value=False)
+        from .clamav_local import LocalClamav, manifest
+        from .defender import find_mpcmdrun
+        self.local_clamav = LocalClamav()
+        self.clamav_offer = manifest() is not None
+        self.has_defender = find_mpcmdrun() is not None
+        self.use_defender = tk.BooleanVar(value=self.has_defender)
+        self.clamav_state = tk.StringVar()
+        self.header = tk.StringVar()
+        self.last_threats = 0
+        try:
+            from .repair import System
+            self.background = schedule.status(System())["protection en temps reel"]
+        except Exception:
+            self.background = False
         self.status = tk.StringVar(value="Pret.")
         self.detections: dict = {}
         self.realtime = tk.BooleanVar(value=False)
         self.watch_stop: threading.Event | None = None
 
         self._build()
+        self._refresh_engines()
+        self._refresh_header()
         self.after(100, self._poll)
+        if scan:  # "Analyser avec FreeAV" depuis le clic droit de l'Explorateur
+            self.after(400, self._start_scan)
 
     def _build(self):
+        self.banner = tk.Frame(self, padx=12, pady=8)
+        self.banner.pack(fill="x")
+        self.banner_label = tk.Label(self.banner, textvariable=self.header, anchor="w",
+                                     font=("Segoe UI", 13, "bold"))
+        self.banner_label.pack(side="left", fill="x", expand=True)
+        from . import installer
+        from .repair import System
+        if getattr(__import__("sys"), "frozen", False) and not installer.is_installed(System()):
+            self.install_btn = ttk.Button(self.banner, text="Installer FreeAV sur ce PC",
+                                          command=self._install_app)
+            self.install_btn.pack(side="right")
+
         top = ttk.Frame(self, padding=10)
         top.pack(fill="x")
         ttk.Label(top, text="Dossier a analyser :").pack(side="left")
@@ -55,7 +90,7 @@ class App(tk.Tk):
         self.stop_btn = ttk.Button(actions, text="Arreter", command=self.stop_flag.set,
                                    state="disabled")
         self.stop_btn.pack(side="left", padx=6)
-        ttk.Checkbutton(actions, text="Utiliser ClamAV (clamd)",
+        ttk.Checkbutton(actions, text="clamd (avance)",
                         variable=self.use_clamav).pack(side="left", padx=12)
         ttk.Button(actions, text="Quarantaine...", command=self._show_quarantine).pack(side="right")
         ttk.Button(actions, text="Reparer mon PC...",
@@ -63,6 +98,18 @@ class App(tk.Tk):
         self.update_btn = ttk.Button(actions, text="Mettre a jour les signatures",
                                      command=self._start_update)
         self.update_btn.pack(side="right", padx=6)
+
+        engines = ttk.Frame(self, padding=(10, 8, 10, 0))
+        engines.pack(fill="x")
+        ttk.Label(engines, text="Moteurs : signatures FreeAV").pack(side="left")
+        defender = ttk.Checkbutton(engines, text="+ 2e avis Microsoft Defender",
+                                   variable=self.use_defender)
+        defender.pack(side="left", padx=10)
+        if not self.has_defender:
+            defender.state(["disabled"])
+        ttk.Label(engines, textvariable=self.clamav_state).pack(side="left", padx=10)
+        self.clamav_btn = ttk.Button(engines, command=self._clamav_action)
+        self.clamav_btn.pack(side="left")
 
         shield = ttk.Frame(self, padding=(10, 8, 10, 0))
         shield.pack(fill="x")
@@ -113,15 +160,87 @@ class App(tk.Tk):
                 if not clamd.ping():
                     self.events.put(("warn", "clamd injoignable : signatures uniquement."))
                     clamd = None
-            scanner = Scanner(load_default(), clamd, yara=build_yara([]))
-            report = scanner.scan([target], exclude=scan_exclusions(self.quarantine.directory, []),
-                                  on_file=lambda p: self.events.put(("file", p)),
-                                  should_stop=self.stop_flag.is_set)
+            scanner = Scanner(load_default(), clamd, yara=build_yara([]),
+                              batch_engines=batch_engines(defender=self.use_defender.get()))
+            report = scanner.scan(
+                [target], exclude=scan_exclusions(self.quarantine.directory, []),
+                on_file=lambda p: self.events.put(("file", p)),
+                should_stop=self.stop_flag.is_set,
+                on_engine=lambda name: self.events.put(
+                    ("status", f"Analyse approfondie par {ENGINE_LABELS.get(name, name)}...")))
             self.events.put(("done", report))
         except Exception as exc:  # ne jamais laisser la fenetre figee
             self.events.put(("failed", f"L'analyse a echoue : {exc}"))
 
+    def _refresh_header(self):
+        if self.last_threats:
+            text, tone = f"Attention : {self.last_threats} menace(s) trouvee(s) lors de la derniere analyse", "danger"
+        elif self.realtime.get():
+            text, tone = "Votre PC est protege : protection en temps reel active", "ok"
+        elif self.background:
+            text, tone = "Votre PC est protege : FreeAV surveille en arriere-plan", "ok"
+        else:
+            text, tone = "Protection en temps reel desactivee : cochez-la ci-dessous", "warn"
+        bg, fg = COLORS[tone]
+        self.header.set(("\u2714  " if tone == "ok" else "\u26a0  ") + text)
+        for widget in (self.banner, self.banner_label):
+            widget.config(bg=bg)
+        self.banner_label.config(fg=fg)
+
+    def _refresh_engines(self):
+        if self.local_clamav.ready():
+            self.clamav_state.set("+ ClamAV integre : pret")
+            self.clamav_btn.config(text="Mettre a jour ClamAV")
+        elif self.clamav_offer:
+            self.clamav_state.set("+ ClamAV integre : non installe")
+            self.clamav_btn.config(text="Installer ClamAV (gratuit)")
+        else:
+            self.clamav_state.set("")
+            self.clamav_btn.pack_forget()
+
+    def _clamav_action(self):
+        ready = self.local_clamav.ready()
+        if not ready and not messagebox.askyesno(
+                "ClamAV", "Installer le moteur antivirus ClamAV (Cisco Talos, gratuit et open "
+                "source) ?\n\nFreeAV telecharge ClamAV puis ses signatures officielles "
+                "(environ 300 Mo). Les analyses deviennent plus completes et plus longues.",
+                parent=self):
+            return
+        self.clamav_btn.state(["disabled"])
+
+        def work():
+            try:
+                say = lambda message: self.events.put(("status", message))
+                if ready:
+                    self.local_clamav.update(say)
+                    msg = "Signatures ClamAV a jour."
+                else:
+                    self.local_clamav.install(progress=say)
+                    msg = "ClamAV est installe : il sera utilise a chaque analyse."
+            except Exception as exc:
+                msg = f"ClamAV : {exc}"
+            self.events.put(("clamav_done", msg))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _install_app(self):
+        from . import installer
+        from .repair import System
+
+        def work():
+            try:
+                done = installer.install(System())
+                msg = ("FreeAV est installe :\n- " + "\n- ".join(done)
+                       + "\n\nVous pouvez l'ouvrir depuis le menu Demarrer ou le Bureau.")
+            except Exception as exc:
+                msg = f"Installation impossible : {exc}"
+            self.events.put(("installed", msg))
+
+        self.install_btn.state(["disabled"])
+        threading.Thread(target=work, daemon=True).start()
+
     def _toggle_realtime(self):
+        self._refresh_header()
         if not self.realtime.get():
             if self.watch_stop:
                 self.watch_stop.set()
@@ -141,7 +260,8 @@ class App(tk.Tk):
                 watch = watcher.FolderWatcher(
                     scanner, folders, self.quarantine,
                     exclude=scan_exclusions(self.quarantine.directory, []),
-                    on_event=lambda event: self.events.put(("watch", event)))
+                    on_event=lambda event: self.events.put(("watch", event)),
+                    removable_drives=watcher.removable_drives)
                 watch.run(stop)
             except Exception as exc:
                 self.events.put(("watch_failed", f"Protection en temps reel arretee : {exc}"))
@@ -150,7 +270,7 @@ class App(tk.Tk):
         self.status.set(f"Protection en temps reel active : {', '.join(map(str, folders))}")
 
     def _show_watch_event(self, event):
-        if event.kind == "erreur":
+        if event.kind in ("erreur", "usb"):
             self.status.set(f"{event.path} : {event.message}")
             return
         if event.detection:
@@ -204,11 +324,21 @@ class App(tk.Tk):
                     self._reset_buttons()
                     self.status.set(payload)
                     messagebox.showerror("FreeAV", payload)
+                elif kind == "status":
+                    self.status.set(payload)
+                elif kind == "clamav_done":
+                    self.clamav_btn.state(["!disabled"])
+                    self._refresh_engines()
+                    self.status.set(payload)
+                    messagebox.showinfo("FreeAV", payload)
+                elif kind == "installed":
+                    messagebox.showinfo("FreeAV", payload)
                 elif kind == "watch":
                     self._show_watch_event(payload)
                 elif kind == "watch_failed":
                     self.realtime.set(False)
                     self.watch_stop = None
+                    self._refresh_header()
                     self.status.set(payload)
                     messagebox.showerror("FreeAV", payload)
                 elif kind == "updated":
@@ -230,6 +360,8 @@ class App(tk.Tk):
             engine = f"{det.engine} (suspect)" if det.suspect else det.engine
             item = self.tree.insert("", "end", values=(det.threat, engine, str(det.path)))
             self.detections[item] = det
+        self.last_threats = len(report.threats)
+        self._refresh_header()
         if report.clean:
             verdict = "Aucune menace detectee."
         else:
@@ -250,6 +382,9 @@ class App(tk.Tk):
             except OSError as exc:
                 messagebox.showerror("FreeAV", f"Echec pour {path} :\n{exc}")
         if moved:
+            self.last_threats = sum(1 for i in self.tree.get_children()
+                                    if (d := self.detections.get(i)) and not d.suspect)
+            self._refresh_header()
             self.status.set(f"{moved} fichier(s) mis en quarantaine, "
                             f"{len(self.tree.get_children())} menace(s) restante(s).")
 
@@ -475,8 +610,8 @@ class ScheduleWindow(tk.Toplevel):
         messagebox.showinfo("FreeAV", "\n".join(done) or "Rien a retirer.", parent=self)
 
 
-def run():
-    App().mainloop()
+def run(scan: str | None = None):
+    App(scan=scan).mainloop()
 
 
 if __name__ == "__main__":

@@ -66,6 +66,24 @@ class WinRegistry:
             raise RegistryError("droits administrateur necessaires") from exc
 
 
+    def delete_key(self, hive: str, key: str) -> None:
+        """Supprime une cle et toutes ses sous-cles (sans erreur si elle n'existe pas)."""
+        try:
+            with winreg.OpenKey(self._hive(hive), key, 0,
+                                winreg.KEY_READ | winreg.KEY_SET_VALUE) as handle:
+                while True:
+                    try:
+                        child = winreg.EnumKey(handle, 0)
+                    except OSError:
+                        break
+                    self.delete_key(hive, key + "\\" + child)
+            winreg.DeleteKey(self._hive(hive), key)
+        except FileNotFoundError:
+            pass
+        except PermissionError as exc:
+            raise RegistryError("droits administrateur necessaires") from exc
+
+
 class System:
     def __init__(self, registry=None, runner=None, hosts_path: Path | None = None,
                  environ: dict | None = None, is_windows: bool = IS_WINDOWS,

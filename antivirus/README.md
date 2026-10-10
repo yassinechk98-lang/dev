@@ -31,7 +31,23 @@ est optionnel (`pip install -r requirements-optional.txt`). Python 3.10 ou plus 
   Telechargements et Bureau, controle des points sensibles du PC, alerte en cas de probleme ;
   journal dans `~/.freeav/logs/auto.log`) et lance la protection en temps reel a chaque ouverture de
   session. `freeav schedule --remove` retire tout, `--status` montre ce qui est actif.
-- **Ligne de commande** et **interface graphique** (Tkinter).
+- **Moteurs antivirus complets** en plus des signatures FreeAV :
+  - **ClamAV integre** (Windows) : un clic sur **Installer ClamAV** (ou `freeav clamav --install`)
+    installe la version officielle de ClamAV (Cisco Talos) dans `%LOCALAPPDATA%\FreeAV\ClamAV`,
+    sans droits administrateur, avec ses signatures officielles (environ 300 Mo, mises a jour par
+    `freeav clamav --update`). Elle est ensuite utilisee a chaque analyse. Le paquet est verifie par
+    son empreinte SHA-256, inscrite dans FreeAV.exe.
+  - **Deuxieme avis Microsoft Defender** (case cochee par defaut sous Windows, `--defender` en ligne
+    de commande) : FreeAV demande a Defender d'analyser les memes dossiers sans rien supprimer, puis
+    met lui-meme les menaces en quarantaine.
+- **Installation comme un vrai logiciel** (Windows, sans droits administrateur) : le bouton
+  **Installer FreeAV sur ce PC** (ou `FreeAV.exe install`) ajoute FreeAV au menu Demarrer et au Bureau,
+  ajoute **Analyser avec FreeAV** au clic droit de l'Explorateur (fichiers, dossiers, lecteurs), et
+  l'inscrit dans Parametres > Applications, d'ou il se desinstalle (`FreeAV.exe uninstall`).
+- **Cles USB** : quand la protection en temps reel est active, chaque cle USB ou carte memoire
+  branchee est analysee entierement et ses menaces mises en quarantaine.
+- **Ligne de commande** et **interface graphique** (Tkinter), avec un bandeau qui dit en un coup
+  d'oeil si le PC est protege.
 
 ## Reparer mon PC
 

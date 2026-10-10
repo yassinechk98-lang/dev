@@ -4,7 +4,9 @@
 
 - **Rien ne quitte votre ordinateur pendant une analyse.** Le scan lit vos fichiers localement et ne
   fait aucune connexion reseau (verifie par le test `test_scan_never_uses_the_network`). Pas de
-  telemetrie, pas de compte, pas d'envoi de fichiers "dans le cloud".
+  telemetrie, pas de compte, pas d'envoi de fichiers "dans le cloud". Seule exception, si vous
+  laissez coche le deuxieme avis Microsoft Defender : Defender applique ses propres reglages
+  (protection dans le cloud, envoi d'echantillons), les memes que pour sa protection habituelle.
 - **Le reseau ne sert qu'a la mise a jour** : quand vous la lancez (`freeav update` ou le bouton de
   l'interface), ou chaque jour si vous avez active la protection automatique et enregistre une cle
   abuse.ch. Elle telecharge des empreintes publiques et n'envoie rien sur vous. La protection en
@@ -53,6 +55,11 @@
 ## Securite du code (GitHub)
 
 - **CodeQL** analyse le code a chaque PR et chaque semaine (`.github/workflows/codeql.yml`).
+- **Moteurs externes** : ClamAV integre analyse sur le PC (clamscan) et ne se met a jour qu'aupres
+  du miroir officiel `database.clamav.net` ; son paquet est refuse si son empreinte SHA-256 ne
+  correspond pas a celle inscrite dans FreeAV.exe, et son archive ne peut rien ecrire hors de son
+  dossier. Microsoft Defender est lance avec `-DisableRemediation` et suit ses propres reglages de
+  confidentialite, deja actifs sur le PC.
 - **Outils de construction figes** (`requirements-build.txt`) pour FreeAV.exe.
 - **Dependabot** propose les mises a jour de securite des dependances et des actions GitHub.
 - Les workflows n'ont que les droits en lecture dont ils ont besoin.

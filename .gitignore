@@ -23,3 +23,4 @@ chat-app/
 # Version Windows de FreeAV (generee par la CI)
 antivirus/freeav/data/freeav.ico
 *.spec
+antivirus/freeav/data/clamav.json
