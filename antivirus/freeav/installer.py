@@ -48,29 +48,40 @@ foreach ($folder in @([Environment]::GetFolderPath('Programs'), [Environment]::G
 
 
 # Lance a part apres la desinstallation : un programme ne peut pas effacer son propre fichier.
-# Le chemin passe par l'environnement (aucun echappement, & ou ^ dans le profil sans danger).
+# FreeAV.exe (PyInstaller) place ses processus enfants dans un "job" Windows qui les arrete
+# avec lui : l'effacement est donc confie a WMI (Win32_Process.Create), hors de ce job. Le
+# script voyage encode en base64 (-EncodedCommand) : rien n'est interprete par cmd.exe, et le
+# chemin est une chaine PowerShell entre apostrophes (& ou ^ dans le profil sans danger).
 SELF_DELETE_SCRIPT = r"""
-for ($i = 0; $i -lt 60 -and (Test-Path -LiteralPath $env:FREEAV_EXE); $i++) {
+$exe = '{exe}'
+for ($i = 0; $i -lt 60 -and (Test-Path -LiteralPath $exe); $i++) {{
   Start-Sleep -Seconds 1
-  Remove-Item -LiteralPath $env:FREEAV_EXE -Force -ErrorAction SilentlyContinue
-}
-$dir = Split-Path -LiteralPath $env:FREEAV_EXE
-if (-not (Test-Path -LiteralPath $env:FREEAV_EXE)) {
-  Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
-}
+  Remove-Item -LiteralPath $exe -Force -ErrorAction SilentlyContinue
+}}
+if (-not (Test-Path -LiteralPath $exe)) {{
+  Remove-Item -LiteralPath ([IO.Path]::GetDirectoryName($exe)) -Recurse -Force -ErrorAction SilentlyContinue
+}}
+"""
+
+LAUNCH_SCRIPT = r"""
+$ErrorActionPreference = 'Stop'
+$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $env:FREEAV_EXE }
+if ($r.ReturnValue -ne 0) { throw "Win32_Process.Create : $($r.ReturnValue)" }
+'OK'
 """
 
 
-def _spawn_self_delete(exe: Path) -> None:
-    import os
-    flags = (getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NO_WINDOW", 0)
-             | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
-    env = {k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"}
-    env["FREEAV_EXE"] = str(exe)
-    subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-                      "-WindowStyle", "Hidden", "-Command", SELF_DELETE_SCRIPT],
-                     env=env, close_fds=True, creationflags=flags,
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def self_delete_command(exe: Path) -> str:
+    import base64
+    script = SELF_DELETE_SCRIPT.format(exe=str(exe).replace("'", "''"))
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    return ("powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden "
+            f"-EncodedCommand {encoded}")
+
+
+def _spawn_self_delete(system: System, exe: Path) -> None:
+    # _powershell passe la valeur par la variable FREEAV_EXE (ici la ligne de commande a lancer)
+    _powershell(system, LAUNCH_SCRIPT, self_delete_command(exe))
 
 
 class InstallError(Exception):
@@ -90,7 +101,7 @@ def running_installed_copy(system: System) -> bool:
         Path(sys.executable).resolve() == target_exe(system).resolve()
 
 
-def _powershell(system: System, script: str, exe: Path) -> None:
+def _powershell(system: System, script: str, exe) -> None:
     import os
     previous = os.environ.get("FREEAV_EXE")
     os.environ["FREEAV_EXE"] = str(exe)  # passe par l'environnement : aucun echappement a faire
@@ -177,7 +188,7 @@ def uninstall(system: System, spawn=None) -> list[str]:
     done.append("moteur ClamAV integre supprime")
     if exe.exists():
         if running_installed_copy(system):
-            (spawn or _spawn_self_delete)(exe)
+            (spawn or _spawn_self_delete)(system, exe)
             done.append(f"FreeAV.exe sera supprime dans quelques secondes ({exe.parent})")
         else:
             try:

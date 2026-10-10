@@ -150,7 +150,7 @@ jobs:
           Get-Content sortie.txt, erreurs.txt | Write-Host
           if ($p.ExitCode -ne 0) { Echec "desinstallation de FreeAV" }
           for ($i = 0; $i -lt 30 -and (Test-Path (Split-Path $installe)); $i++) { Start-Sleep -Seconds 1 }
-          if (Test-Path (Split-Path $installe)) { Echec "dossier de FreeAV toujours present apres la desinstallation" }
+          if (Test-Path (Split-Path $installe)) { Get-ChildItem -Recurse (Split-Path $installe) | Write-Host; Echec "dossier de FreeAV toujours present apres la desinstallation" }
           if (Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\FreeAV") { Echec "toujours dans Parametres > Applications" }
           if (Test-Path -LiteralPath "HKCU:\Software\Classes\*\shell\FreeAV") { Echec "clic droit toujours present" }
           if (Test-Path $raccourci) { Echec "raccourci toujours present" }

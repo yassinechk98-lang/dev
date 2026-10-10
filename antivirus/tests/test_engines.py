@@ -259,10 +259,19 @@ def test_uninstall_of_the_running_installed_copy_deletes_it_afterwards(tmp_path,
     exe = installer.target_exe(system)
     monkeypatch.setattr(installer, "running_installed_copy", lambda system: True)
     spawned = []
-    done = installer.uninstall(system, spawn=spawned.append)
-    assert spawned == [exe]  # le chemin passe par l'environnement, pas par une ligne de cmd
-    assert "FREEAV_EXE" in installer.SELF_DELETE_SCRIPT and "-LiteralPath" in installer.SELF_DELETE_SCRIPT
+    done = installer.uninstall(system, spawn=lambda system, path: spawned.append(path))
+    assert spawned == [exe]
     assert any("quelques secondes" in d for d in done)
+
+
+def test_self_delete_command_cannot_be_broken_by_the_profile_path():
+    import base64
+    exe = Path(r"C:\Users\Jean & Marie's ^PC\AppData\Local\FreeAV\FreeAV.exe")
+    command = installer.self_delete_command(exe)
+    head, encoded = command.rsplit(" -EncodedCommand ", 1)
+    assert "&" not in command and "^" not in command and "'" not in command
+    script = base64.b64decode(encoded).decode("utf-16-le")
+    assert "$exe = 'C:\\Users\\Jean & Marie''s ^PC\\AppData" in script
 
 
 def test_right_click_on_a_drive_keeps_the_drive_path():
