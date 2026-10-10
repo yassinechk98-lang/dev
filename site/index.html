@@ -12,18 +12,21 @@
   --bg:#f7faf8; --surface:#ffffff; --text:#0f1a14; --muted:#526158; --border:#dfe7e2;
   --accent:#16a34a; --accent-strong:#15803d; --accent-soft:#e7f6ec; --on-accent:#ffffff;
   --accent-2:#0284c7; --danger:#dc2626; --danger-soft:#fdecec; --blob:.22; --shadow:rgba(15,26,20,.18);
+  --warn:#b45309; --warn-soft:#fef3c7;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0b110e; --surface:#121a16; --text:#e8f0eb; --muted:#9aaba1; --border:#24302a;
     --accent:#22c55e; --accent-strong:#4ade80; --accent-soft:#132a1c; --on-accent:#05210f;
     --accent-2:#38bdf8; --danger:#f87171; --danger-soft:#2a1414; --blob:.16; --shadow:rgba(0,0,0,.5);
+    --warn:#fbbf24; --warn-soft:#2a2110;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0b110e; --surface:#121a16; --text:#e8f0eb; --muted:#9aaba1; --border:#24302a;
   --accent:#22c55e; --accent-strong:#4ade80; --accent-soft:#132a1c; --on-accent:#05210f;
   --accent-2:#38bdf8; --danger:#f87171; --danger-soft:#2a1414; --blob:.16; --shadow:rgba(0,0,0,.5);
+  --warn:#fbbf24; --warn-soft:#2a2110;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -88,8 +91,8 @@ h1{font-size:clamp(32px,6vw,52px);line-height:1.1;margin:18px 0 16px;letter-spac
 .scan-row{display:flex;justify-content:space-between;align-items:center;gap:12px;font-weight:600}
 .scan-status{display:flex;align-items:center;gap:8px}
 .scan-status::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent);animation:blink 1s ease-in-out infinite}
-.scan-demo.done .scan-status::before{animation:none;width:16px;height:16px;background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8.5 2.5 2.5L12 5.5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat}
-.scan-pct{font-variant-numeric:tabular-nums;color:var(--accent-strong)}
+.done .scan-status::before{animation:none;width:16px;height:16px;background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8.5 2.5 2.5L12 5.5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat}
+.scan-pct{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--accent-strong)}
 .bar{height:8px;border-radius:999px;background:var(--accent-soft);margin:12px 0 10px;overflow:hidden}
 .bar span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:inherit;transform:scaleX(0);transform-origin:left}
 .scan-file{font:13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -131,6 +134,39 @@ details p{color:var(--muted);margin:10px 0 0}
 details[open] p{animation:fadeDown .35s ease}
 footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font-size:14px;text-align:center}
 
+/* Réparer mon PC */
+.center{text-align:center;margin:0 0 6px}
+.repair-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+.checks{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.checks li{display:grid;grid-template-columns:40px 1fr;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;transition:border-color .25s,transform .25s}
+.checks li:hover{border-color:var(--accent);transform:translateX(4px)}
+.checks li:hover .icon{animation:wiggle .55s ease}
+.checks strong{display:block;font-size:16px}
+.checks span{display:block;color:var(--muted);font-size:14px;line-height:1.45}
+.repair-demo{margin:0;max-width:none}
+.rd-list{list-style:none;padding:0;margin:14px 0 0}
+.rd-list li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px;transition:opacity .35s ease,transform .35s ease}
+.js .rd-list li{opacity:0;transform:translateY(8px)}
+.js .rd-list li.on{opacity:1;transform:none}
+.sev{min-width:74px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:999px;transition:opacity .3s}
+.sev.danger{color:var(--danger);background:var(--danger-soft)}
+.sev.suspect{color:var(--warn);background:var(--warn-soft)}
+.sev.info{color:var(--muted);background:var(--bg);border:1px solid var(--border)}
+.rd-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .3s}
+.rd-done{color:var(--accent-strong);font-weight:700;font-size:13px;opacity:0;transform:scale(.6);transition:opacity .3s ease,transform .35s cubic-bezier(.3,1.6,.5,1)}
+.rd-done::before{content:"✓ "}
+.rd-list li.fixed .rd-done{opacity:1;transform:none}
+.rd-list li.fixed .rd-title{color:var(--muted)}
+.rd-list li.fixed .sev{opacity:.45}
+.rd-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+.rd-btn{background:var(--accent);color:var(--on-accent);padding:8px 14px;border-radius:8px;font-weight:600;font-size:14px;transition:transform .2s ease,box-shadow .2s ease}
+.rd-btn.press{transform:scale(.94);box-shadow:0 0 0 6px var(--accent-soft)}
+.rd-note{font-size:13px;color:var(--muted)}
+.safe-grid{margin-top:24px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.beta{max-width:760px;margin:20px auto 0;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--warn);border-radius:10px;padding:12px 16px;color:var(--muted);font-size:14px}
+.beta strong{color:var(--text)}
+.beta code{white-space:nowrap}
+
 /* Apparition au défilement */
 .js .reveal{opacity:0}
 .js .reveal.visible{opacity:1;animation:fadeUp .7s cubic-bezier(.2,.7,.2,1) var(--d,0s) backwards}
@@ -139,8 +175,11 @@ footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font
 .grid > :nth-child(3n+2){--d:.1s}
 .grid > :nth-child(3n+3){--d:.2s}
 .steps > :nth-child(2),details:nth-of-type(2){--d:.12s}
-.steps > :nth-child(3),details:nth-of-type(3){--d:.24s}
-details:nth-of-type(4){--d:.36s}
+.steps > :nth-child(3),details:nth-of-type(3),.checks > :nth-child(3){--d:.24s}
+.steps > :nth-child(4),details:nth-of-type(4),.checks > :nth-child(4){--d:.36s}
+details:nth-of-type(5),.checks > :nth-child(5){--d:.48s}
+.checks > :nth-child(2){--d:.12s}
+.checks > :nth-child(6){--d:.6s}
 
 @property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
 @keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
@@ -160,7 +199,8 @@ details:nth-of-type(4){--d:.36s}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
 @keyframes spin-border{to{--angle:360deg}}
 
-@media (max-width:560px){nav{display:none}.hero{padding:44px 0 40px}.scan-demo{margin-top:32px}}
+@media (max-width:760px){nav{display:none}.repair-grid{grid-template-columns:1fr}}
+@media (max-width:560px){.hero{padding:44px 0 40px}.scan-demo{margin-top:32px}.rd-list li{font-size:13px}.rd-title{white-space:normal;line-height:1.35}.sev{min-width:0}}
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{animation:none!important;transition:none!important}
@@ -177,6 +217,7 @@ details:nth-of-type(4){--d:.36s}
     </a>
     <nav>
       <a href="#fonctionnalites">Fonctionnalités</a>
+      <a href="#reparer">Réparer mon PC</a>
       <a href="#comment">Comment ça marche</a>
       <a href="#telecharger">Télécharger</a>
       <a href="#faq">FAQ</a>
@@ -201,7 +242,7 @@ details:nth-of-type(4){--d:.36s}
       </div>
       <span class="badge">100 % gratuit · Open source</span>
       <h1>Protégez votre ordinateur,<br><span class="grad">sans payer un centime.</span></h1>
-      <p class="lead">FreeAV analyse vos fichiers et détecte les virus grâce aux signatures ClamAV, mises à jour chaque jour. Pas de publicité, pas d'abonnement, pas de collecte de données.</p>
+      <p class="lead">FreeAV analyse vos fichiers, détecte les virus grâce aux signatures ClamAV mises à jour chaque jour, et vous aide à réparer les problèmes qu'ils laissent sur votre PC. Pas de publicité, pas d'abonnement, pas de collecte de données.</p>
       <div class="ctas">
         <a class="btn btn-primary shine" href="#telecharger">Télécharger gratuitement</a>
         <a class="btn btn-ghost" href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener">Voir le code source</a>
@@ -262,14 +303,88 @@ details:nth-of-type(4){--d:.36s}
     </div>
   </section>
 
+  <section id="reparer">
+    <div class="wrap">
+      <p class="center reveal"><span class="badge">Nouveau</span></p>
+      <h2 class="reveal">Réparer mon PC</h2>
+      <p class="sub reveal">FreeAV repère les problèmes que laissent souvent les logiciels malveillants. Il commence par un diagnostic qui ne modifie rien, puis vous choisissez ce qu'il faut réparer.</p>
+      <div class="repair-grid">
+        <ul class="checks">
+          <li class="reveal">
+            <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg></div>
+            <div><strong>Démarrage</strong><span>Programmes lancés au démarrage, tâches planifiées cachées, ouverture de session détournée.</span></div>
+          </li>
+          <li class="reveal">
+            <div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg></div>
+            <div><strong>Réseau</strong><span>Fichier hosts modifié, proxy imposé.</span></div>
+          </li>
+          <li class="reveal">
+            <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M7 6.5h.01"/></svg></div>
+            <div><strong>Navigateur</strong><span>Extensions, page d'accueil ou moteur de recherche imposés dans Chrome et Edge.</span></div>
+          </li>
+          <li class="reveal">
+            <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/></svg></div>
+            <div><strong>Protection</strong><span>Microsoft Defender désactivé ou dossiers exclus de l'analyse.</span></div>
+          </li>
+          <li class="reveal">
+            <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg></div>
+            <div><strong>Nettoyage</strong><span>Fichiers temporaires inutiles, disque presque plein.</span></div>
+          </li>
+          <li class="reveal">
+            <div class="icon"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></div>
+            <div><strong>Outils Windows</strong><span>Lancement des outils de réparation intégrés (SFC, DISM) et vidage du cache DNS.</span></div>
+          </li>
+        </ul>
+        <div class="scan-demo repair-demo reveal" id="repairDemo" role="img" aria-label="Démonstration animée : FreeAV trouve cinq problèmes sans rien modifier, puis répare ceux que l'utilisateur a choisis.">
+          <div class="scan-top"><span class="dots"><i></i><i></i><i></i></span><span>FreeAV · Réparer mon PC</span></div>
+          <div class="scan-body">
+            <div class="scan-row"><span class="scan-status" data-r="status">Diagnostic en cours…</span><span class="scan-pct" data-r="count"></span></div>
+            <ul class="rd-list">
+              <li><span class="sev danger">Danger</span><span class="rd-title">Programme au démarrage : updater32.exe</span><span class="rd-done">Réparé</span></li>
+              <li><span class="sev danger">Danger</span><span class="rd-title">Microsoft Defender désactivé</span><span class="rd-done">Réparé</span></li>
+              <li><span class="sev suspect">Suspect</span><span class="rd-title">Redirection dans le fichier hosts</span><span class="rd-done">Réparé</span></li>
+              <li><span class="sev suspect">Suspect</span><span class="rd-title">Chrome : moteur de recherche imposé</span><span class="rd-done">Réparé</span></li>
+              <li><span class="sev info">Info</span><span class="rd-title">2 140 Mo de fichiers temporaires</span><span class="rd-done">Nettoyé</span></li>
+            </ul>
+            <div class="rd-foot"><span class="rd-btn" data-r="btn">Réparer la sélection</span><span class="rd-note" data-r="note">Rien n'a été modifié</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid safe-grid">
+        <div class="card reveal">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
+          <h3>Diagnostic sans risque</h3>
+          <p>La première étape regarde seulement. Rien n'est modifié sur votre PC.</p>
+        </div>
+        <div class="card reveal">
+          <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/></svg></div>
+          <h3>Vous gardez la main</h3>
+          <p>Rien n'est réparé sans votre accord : vous choisissez chaque réparation.</p>
+        </div>
+        <div class="card reveal">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></div>
+          <h3>Retour en arrière</h3>
+          <p>Chaque modification est sauvegardée et peut être annulée. Seuls le nettoyage et les outils Windows sont définitifs, et c'est indiqué avant.</p>
+        </div>
+        <div class="card reveal">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></div>
+          <h3>Point de restauration</h3>
+          <p>Lancé en administrateur, FreeAV crée un point de restauration Windows avant de réparer.</p>
+        </div>
+      </div>
+      <p class="beta reveal"><strong>Fonction en test.</strong> Elle est conçue pour Windows et a été vérifiée sur un PC de test simulé, mais pas encore sur de vrais ordinateurs. Gardez une sauvegarde de vos fichiers importants. En ligne de commande : <code>python -m freeav repair</code>.</p>
+    </div>
+  </section>
+
   <section id="comment">
     <div class="wrap">
       <h2 class="reveal">Comment ça marche</h2>
-      <p class="sub reveal">Trois étapes, et vous êtes protégé.</p>
+      <p class="sub reveal">Quelques étapes, et vous êtes protégé.</p>
       <ol class="steps">
         <li class="reveal"><strong>Téléchargez et installez FreeAV.</strong><br><span style="color:var(--muted)">Gratuit, sans inscription.</span></li>
         <li class="reveal"><strong>Lancez une analyse.</strong><br><span style="color:var(--muted)">Depuis l'interface graphique ou en ligne de commande (<code>python -m freeav scan</code>).</span></li>
         <li class="reveal"><strong>Gérez les menaces détectées.</strong><br><span style="color:var(--muted)">Mettez-les en quarantaine ou supprimez-les en un clic.</span></li>
+        <li class="reveal"><strong>Réparez votre PC si besoin.</strong><br><span style="color:var(--muted)">Avec « Réparer mon PC » : un diagnostic d'abord, puis seulement les réparations que vous choisissez.</span></li>
       </ol>
     </div>
   </section>
@@ -293,6 +408,7 @@ details:nth-of-type(4){--d:.36s}
       <details class="reveal"><summary>Comment FreeAV détecte-t-il les virus ?</summary><p>FreeAV compare vos fichiers à la base de signatures ClamAV, un moteur antivirus open source reconnu et mis à jour quotidiennement.</p></details>
       <details class="reveal"><summary>FreeAV remplace-t-il Windows Defender ?</summary><p>FreeAV est un outil d'analyse complémentaire. Nous recommandons de garder la protection intégrée de votre système activée.</p></details>
       <details class="reveal"><summary>Mes fichiers sont-ils envoyés sur Internet ?</summary><p>Non. L'analyse se fait entièrement en local. Seules les mises à jour de signatures sont téléchargées.</p></details>
+      <details class="reveal"><summary>« Réparer mon PC » peut-il abîmer mon ordinateur ?</summary><p>Le diagnostic ne modifie rien. Ensuite, FreeAV ne répare que ce que vous choisissez et sauvegarde chaque modification pour pouvoir l'annuler. Le nettoyage des fichiers temporaires et les outils Windows ne s'annulent pas : c'est indiqué avant de les lancer. La fonction est encore en test, gardez une sauvegarde de vos fichiers importants.</p></details>
     </div>
   </section>
 </main>
@@ -322,6 +438,65 @@ details:nth-of-type(4){--d:.36s}
       });
     }, {threshold:0.15, rootMargin:'0px 0px -40px 0px'});
     items.forEach(function(el){ io.observe(el); });
+  }
+
+  // Démo « Réparer mon PC » : diagnostic puis réparations, en boucle
+  var rd = document.getElementById('repairDemo');
+  if (rd) {
+    var r = {};
+    rd.querySelectorAll('[data-r]').forEach(function(n){ r[n.getAttribute('data-r')] = n; });
+    var rows = rd.querySelectorAll('.rd-list li');
+    var n = rows.length;
+    var plural = function(k){ return k + (k > 1 ? ' problèmes' : ' problème'); };
+    var at = function(ms, fn){ setTimeout(fn, ms); };
+    var showFinal = function(){
+      rows.forEach(function(li){ li.classList.add('on', 'fixed'); });
+      rd.classList.add('done');
+      r.status.textContent = 'Réparations terminées';
+      r.count.textContent = plural(n);
+      r.note.textContent = 'Sauvegarde créée, annulation possible';
+    };
+    var cycle = function(){
+      rd.classList.remove('done');
+      rows.forEach(function(li){ li.classList.remove('on', 'fixed'); });
+      r.status.textContent = 'Diagnostic en cours…';
+      r.count.textContent = '';
+      r.note.textContent = "Rien n'a été modifié";
+      var t = 400;
+      rows.forEach(function(li, i){
+        at(t + i * 650, function(){ li.classList.add('on'); r.count.textContent = plural(i + 1); });
+      });
+      t += n * 650 + 300;
+      at(t, function(){
+        rd.classList.add('done');
+        r.status.textContent = 'Diagnostic terminé';
+        r.note.textContent = plural(n) + " trouvés, rien n'a été modifié";
+      });
+      t += 1800;
+      at(t, function(){ r.btn.classList.add('press'); });
+      at(t + 350, function(){
+        r.btn.classList.remove('press');
+        rd.classList.remove('done');
+        r.status.textContent = 'Réparation…';
+        r.note.textContent = 'Réparation des problèmes choisis';
+      });
+      t += 600;
+      rows.forEach(function(li, i){ at(t + i * 550, function(){ li.classList.add('fixed'); }); });
+      t += n * 550 + 200;
+      at(t, function(){
+        rd.classList.add('done');
+        r.status.textContent = 'Réparations terminées';
+        r.note.textContent = 'Sauvegarde créée, annulation possible';
+      });
+      at(t + 4000, cycle);
+    };
+    if (reduce || !('IntersectionObserver' in window)) showFinal();
+    else {
+      var rdObs = new IntersectionObserver(function(entries){
+        if (entries[0].isIntersecting) { rdObs.disconnect(); cycle(); }
+      }, {threshold:0.3});
+      rdObs.observe(rd);
+    }
   }
 
   // Démo d'analyse en boucle
