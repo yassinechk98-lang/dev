@@ -18,6 +18,12 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"FreeAV {__version__} - Antivirus gratuit")
+        icon = Path(__file__).parent / "data" / "freeav.ico"  # ajoutee par la version Windows
+        if icon.is_file():
+            try:
+                self.iconbitmap(default=str(icon))
+            except tk.TclError:
+                pass
         self.geometry("880x500")
         self.minsize(600, 380)
 
