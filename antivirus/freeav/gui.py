@@ -112,7 +112,11 @@ class App(tk.Tk):
                 "Creez-la sur https://auth.abuse.ch puis collez-la ici :", parent=self)
             if not key or not key.strip():
                 return
-            updater.save_auth_key(key)
+            try:
+                updater.save_auth_key(key)
+            except updater.UpdateError as exc:
+                messagebox.showerror("FreeAV", str(exc), parent=self)
+                return
         self.update_btn.config(state="disabled")
         self.status.set("Telechargement des signatures MalwareBazaar...")
 

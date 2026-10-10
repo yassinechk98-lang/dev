@@ -150,37 +150,53 @@ def test_yara_rules_detect_and_bad_rules_are_isolated(tmp_path):
         ("YARA.Faux_Rancongiciel", "yara")]
 
 
-FEED = ("# MalwareBazaar recent malware samples (SHA256 hashes)\n"
-        "#\n" + hashlib.sha256(b"malware-a").hexdigest() + "\n"
-        + hashlib.sha256(b"malware-b").hexdigest() + "\n").encode()
+KEY = "cle-de-test-123"
+
+
+def _csv_row(content: bytes, family: str) -> str:
+    return (f'"2026-10-10 10:00:00", "{hashlib.sha256(content).hexdigest()}", '
+            f'"{hashlib.md5(content).hexdigest()}", "x", "abuse_ch", "f.exe", "exe", '
+            f'"application/x-dosexec", "{family}", "n/a", "n/a", "n/a", "n/a", "n/a"\n')
+
+
+# Format de l'export CSV de MalwareBazaar (en-tete dans un commentaire).
+FEED = ("################################################################\n"
+        "# MalwareBazaar recent malware samples (CSV)                   #\n"
+        '# "first_seen_utc","sha256_hash","md5_hash","sha1_hash","reporter","file_name",'
+        '"file_type_guess","mime_type","signature","clamav","vtpercent","imphash","ssdeep","tlsh"\n'
+        + _csv_row(b"malware-a", "AgentTesla") + _csv_row(b"malware-b", "n/a")).encode()
 
 
 def test_update_writes_private_signature_file_used_by_scanner(tmp_path, monkeypatch):
     monkeypatch.setattr(updater, "download", lambda url, key="": FEED)
     sig_dir = tmp_path / "signatures"
-    path, added, total = updater.update_malwarebazaar(directory=sig_dir, auth_key="")
+    path, added, total = updater.update_malwarebazaar(directory=sig_dir, auth_key=KEY)
     assert (added, total) == (2, 2)
     if os.name == "posix":
         assert stat.S_IMODE(sig_dir.stat().st_mode) == 0o700
     (tmp_path / "x.exe").write_bytes(b"malware-b")
     report = Scanner(load_default(downloaded_dir=sig_dir)).scan([tmp_path / "x.exe"])
     assert report.detections[0].threat == "MalwareBazaar.Malware"
+    (tmp_path / "y.exe").write_bytes(b"malware-a")
+    report = Scanner(load_default(downloaded_dir=sig_dir)).scan([tmp_path / "y.exe"])
+    assert report.detections[0].threat == "MalwareBazaar.AgentTesla"
 
 
 @pytest.mark.parametrize("feed", [
     b"<html>page piegee</html>\n",
     b"# vide\n",
-    FEED + b"sha256:abc:Injection\n",
+    FEED + b'"2026-10-10", "pas-une-empreinte", "x"\n',
     "é".encode(),
+    b"\xff\xfe",
 ])
 def test_update_rejects_tampered_feed_and_keeps_old_db(tmp_path, monkeypatch, feed):
     sig_dir = tmp_path / "signatures"
     monkeypatch.setattr(updater, "download", lambda url, key="": FEED)
-    updater.update_malwarebazaar(directory=sig_dir, auth_key="")
+    updater.update_malwarebazaar(directory=sig_dir, auth_key=KEY)
     before = (sig_dir / "malwarebazaar.txt").read_text()
     monkeypatch.setattr(updater, "download", lambda url, key="": feed)
     with pytest.raises(updater.UpdateError):
-        updater.update_malwarebazaar(directory=sig_dir, auth_key="")
+        updater.update_malwarebazaar(directory=sig_dir, auth_key=KEY)
     assert (sig_dir / "malwarebazaar.txt").read_text() == before
     assert [p.name for p in sig_dir.iterdir()] == ["malwarebazaar.txt"]
 
@@ -390,20 +406,36 @@ class _FakeOpener:
 def test_update_sends_auth_key_and_explains_missing_key(monkeypatch):
     opener = _FakeOpener()
     monkeypatch.setattr(urllib.request, "build_opener", lambda *handlers: opener)
-    assert updater.download(updater.MALWAREBAZAAR_URL, auth_key="ma-cle") == FEED
-    assert opener.request.get_header("Auth-key") == "ma-cle"
+    monkeypatch.delenv(updater.AUTH_KEY_ENV, raising=False)
+    _path, added, _total = updater.update_malwarebazaar(directory=_tmp_sig_dir(), auth_key=KEY)
+    # Adresse documentee par abuse.ch : la cle dans le chemin de l'export v2.
+    assert opener.request.full_url == f"https://mb-api.abuse.ch/v2/files/exports/{KEY}/recent.csv"
+    assert added == 2
     monkeypatch.setattr(urllib.request, "build_opener", lambda *handlers: _FakeOpener(401))
-    with pytest.raises(updater.UpdateError, match="Auth-Key"):
-        updater.download(updater.MALWAREBAZAAR_URL)
+    with pytest.raises(updater.UpdateError, match="Auth-Key") as err:
+        updater.update_malwarebazaar(directory=_tmp_sig_dir(), auth_key=KEY)
+    assert KEY not in str(err.value)  # la cle n'apparait jamais dans les messages
+
+
+def _tmp_sig_dir():
+    import tempfile
+    return pathlib.Path(tempfile.mkdtemp()) / "signatures"
+
+
+@pytest.mark.parametrize("key", ["", "a/../../autre", "cle avec espace", "x" * 200])
+def test_update_rejects_missing_or_unsafe_key(key, monkeypatch):
+    monkeypatch.setattr(updater, "download", lambda url, key="": pytest.fail("aucun appel"))
+    with pytest.raises(updater.UpdateError):
+        updater.update_malwarebazaar(directory=_tmp_sig_dir(), auth_key=key)
 
 
 def test_updates_accumulate_instead_of_replacing(tmp_path, monkeypatch):
     sig_dir = tmp_path / "signatures"
     monkeypatch.setattr(updater, "download", lambda url, key="": FEED)
-    updater.update_malwarebazaar(directory=sig_dir, auth_key="")
-    newer = ("#\n" + hashlib.sha256(b"malware-c").hexdigest() + "\n").encode()
+    updater.update_malwarebazaar(directory=sig_dir, auth_key=KEY)
+    newer = _csv_row(b"malware-c", "Emotet").encode()
     monkeypatch.setattr(updater, "download", lambda url, key="": newer)
-    _path, added, total = updater.update_malwarebazaar(directory=sig_dir, auth_key="")
+    _path, added, total = updater.update_malwarebazaar(directory=sig_dir, auth_key=KEY)
     assert (added, total) == (1, 3)
 
 
@@ -411,6 +443,6 @@ def test_updates_accumulate_instead_of_replacing(tmp_path, monkeypatch):
 def test_auth_key_is_saved_privately(tmp_path, monkeypatch):
     monkeypatch.delenv(updater.AUTH_KEY_ENV, raising=False)
     config = tmp_path / "app" / "config.json"
-    updater.save_auth_key(" cle-secrete ", config)
-    assert updater.load_auth_key(config) == "cle-secrete"
+    updater.save_auth_key(" cle-secrete-42 ", config)
+    assert updater.load_auth_key(config) == "cle-secrete-42"
     assert stat.S_IMODE(config.stat().st_mode) == 0o600

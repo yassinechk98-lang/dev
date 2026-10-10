@@ -114,11 +114,11 @@ def cmd_quarantine(args) -> int:
 
 
 def cmd_update(args) -> int:
-    if args.auth_key and args.save_key:
-        updater.save_auth_key(args.auth_key)
-        print("Cle Auth-Key enregistree dans ~/.freeav/config.json.")
-    print("Telechargement des signatures MalwareBazaar (abuse.ch)...")
     try:
+        if args.auth_key and args.save_key:
+            updater.save_auth_key(args.auth_key)
+            print("Cle Auth-Key enregistree dans ~/.freeav/config.json.")
+        print("Telechargement des signatures MalwareBazaar (abuse.ch)...")
         path, added, total = updater.update_malwarebazaar(args.url, auth_key=args.auth_key or None)
     except (updater.UpdateError, OSError) as exc:
         print(f"Erreur : mise a jour impossible : {exc}", file=sys.stderr)

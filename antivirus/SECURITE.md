@@ -7,6 +7,9 @@
   telemetrie, pas de compte, pas d'envoi de fichiers "dans le cloud".
 - **Le reseau ne sert qu'a la mise a jour, et seulement quand vous la lancez** (`freeav update` ou le
   bouton de l'interface). Elle telecharge des empreintes publiques et n'envoie rien sur vous.
+- **La cle abuse.ch ne sert qu'a abuse.ch** : elle est envoyee uniquement a `mb-api.abuse.ch`
+  (dans l'adresse de l'export, comme l'exige leur documentation), en HTTPS, et n'apparait jamais
+  dans les messages d'erreur.
 - **Mises a jour protegees contre la falsification** : HTTPS obligatoire avec verification du
   certificat (une redirection vers `http://` est refusee), taille limitee, chaque ligne verifiee (une ligne inattendue fait tout refuser),
   ecriture atomique (une mise a jour ratee laisse l'ancienne base intacte).
