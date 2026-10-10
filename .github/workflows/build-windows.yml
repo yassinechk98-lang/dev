@@ -82,6 +82,28 @@ jobs:
           Remove-Item $echantillon
           $code = Lance-FreeAV
           if ($code[-1] -ne 0) { Echec "aucune menace attendue (code 0), obtenu $($code[-1])" }
+          function Lance($arguments) {
+            $p = Start-Process dist/FreeAV.exe -ArgumentList $arguments -Wait -PassThru `
+              -RedirectStandardOutput sortie.txt -RedirectStandardError erreurs.txt
+            Get-Content sortie.txt, erreurs.txt | Write-Host
+            return $p.ExitCode
+          }
+          # Protection automatique : installation reelle, verification, puis retrait
+          if ((Lance @("schedule", "--at", "03:00")) -ne 0) { Echec "installation de la protection automatique" }
+          schtasks /query /tn "FreeAV\Analyse quotidienne" | Out-Null
+          if ($LASTEXITCODE -ne 0) { Echec "tache planifiee absente" }
+          $run = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run").FreeAV
+          if ($run -notlike "*\FreeAV\FreeAV.exe*watch --quarantine --notify") { Echec "entree de demarrage incorrecte : $run" }
+          if (-not (Test-Path "$env:LOCALAPPDATA\FreeAV\FreeAV.exe")) { Echec "FreeAV.exe non copie" }
+          if ((Lance @("schedule", "--remove")) -ne 0) { Echec "retrait de la protection automatique" }
+          schtasks /query /tn "FreeAV\Analyse quotidienne" 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) { Echec "tache planifiee toujours presente" }
+          if ((Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run").FreeAV) { Echec "entree de demarrage toujours presente" }
+          # Entretien automatique : doit s'executer jusqu'au bout et ecrire son journal
+          $code = Lance @("auto")
+          if ($code -gt 1) { Echec "entretien automatique, code $code" }
+          if (-not (Test-Path "$HOME\.freeav\logs\auto.log")) { Echec "journal de l'entretien absent" }
+          $global:LASTEXITCODE = 0
           (Get-FileHash dist/FreeAV.exe -Algorithm SHA256).Hash.ToLower() + "  FreeAV.exe" | Set-Content dist/FreeAV.exe.sha256
 
       - uses: actions/upload-artifact@v4

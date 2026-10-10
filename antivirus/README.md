@@ -21,6 +21,16 @@ est optionnel (`pip install -r requirements-optional.txt`). Python 3.10 ou plus 
   gratuite (Auth-Key) a creer sur https://auth.abuse.ch.
 - **Quarantaine** : les fichiers infectes sont deplaces dans `~/.freeav/quarantine`, encodes pour ne
   plus etre executables, et peuvent etre restaures ou supprimes.
+- **Protection en temps reel** : `python -m freeav watch --quarantine` (ou la case dans l'interface)
+  surveille Telechargements et Bureau et analyse chaque nouveau fichier des qu'il est entierement
+  ecrit. Les menaces confirmees sont mises en quarantaine aussitot ; un fichier suspect est
+  seulement signale.
+- **Protection automatique** (Windows, sans droits administrateur) :
+  `python -m freeav schedule --at 12:00` (ou le bouton **Protection automatique...**) installe une
+  analyse quotidienne (mise a jour des signatures si une cle abuse.ch est enregistree, analyse de
+  Telechargements et Bureau, controle des points sensibles du PC, alerte en cas de probleme ;
+  journal dans `~/.freeav/logs/auto.log`) et lance la protection en temps reel a chaque ouverture de
+  session. `freeav schedule --remove` retire tout, `--status` montre ce qui est actif.
 - **Ligne de commande** et **interface graphique** (Tkinter).
 
 ## Reparer mon PC
@@ -108,6 +118,8 @@ pytest
 ## Limites du prototype
 
 Les fichiers de plus de 200 Mo ne sont pas analyses (ils sont comptes comme "ignores").
-Pas encore de protection en temps reel ni de mise a jour automatique planifiee. Aucun antivirus,
+La protection en temps reel verifie les fichiers apres leur arrivee dans les dossiers surveilles
+(toutes les 2 secondes) : elle ne bloque pas l'ouverture d'un fichier comme le pilote d'un antivirus
+commercial, et ne surveille pas tout le disque. Aucun antivirus,
 gratuit ou payant, ne detecte toutes les menaces : FreeAV complete les bonnes pratiques
 (mises a jour du systeme, sauvegardes, prudence avec les pieces jointes), il ne les remplace pas.

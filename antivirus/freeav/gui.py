@@ -6,7 +6,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from . import __version__, updater
+from . import __version__, schedule, updater, watcher
 from .clamav import ClamdClient
 from .cli import build_yara, malware_checker, scan_exclusions
 from .quarantine import Quarantine
@@ -35,6 +35,8 @@ class App(tk.Tk):
         self.use_clamav = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value="Pret.")
         self.detections: dict = {}
+        self.realtime = tk.BooleanVar(value=False)
+        self.watch_stop: threading.Event | None = None
 
         self._build()
         self.after(100, self._poll)
@@ -61,6 +63,13 @@ class App(tk.Tk):
         self.update_btn = ttk.Button(actions, text="Mettre a jour les signatures",
                                      command=self._start_update)
         self.update_btn.pack(side="right", padx=6)
+
+        shield = ttk.Frame(self, padding=(10, 8, 10, 0))
+        shield.pack(fill="x")
+        ttk.Checkbutton(shield, text="Protection en temps reel (Telechargements et Bureau)",
+                        variable=self.realtime, command=self._toggle_realtime).pack(side="left")
+        ttk.Button(shield, text="Protection automatique...",
+                   command=lambda: ScheduleWindow(self)).pack(side="right")
 
         self.progress = ttk.Progressbar(self, mode="indeterminate")
         self.progress.pack(fill="x", padx=10, pady=8)
@@ -112,6 +121,49 @@ class App(tk.Tk):
         except Exception as exc:  # ne jamais laisser la fenetre figee
             self.events.put(("failed", f"L'analyse a echoue : {exc}"))
 
+    def _toggle_realtime(self):
+        if not self.realtime.get():
+            if self.watch_stop:
+                self.watch_stop.set()
+                self.watch_stop = None
+            self.status.set("Protection en temps reel arretee.")
+            return
+        folders = watcher.default_folders()
+        if not folders:
+            self.realtime.set(False)
+            messagebox.showwarning("FreeAV", "Aucun dossier Telechargements ou Bureau trouve.")
+            return
+        stop = self.watch_stop = threading.Event()
+
+        def work():
+            try:
+                scanner = Scanner(load_default(), yara=build_yara([]))
+                watch = watcher.FolderWatcher(
+                    scanner, folders, self.quarantine,
+                    exclude=scan_exclusions(self.quarantine.directory, []),
+                    on_event=lambda event: self.events.put(("watch", event)))
+                watch.run(stop)
+            except Exception as exc:
+                self.events.put(("watch_failed", f"Protection en temps reel arretee : {exc}"))
+
+        threading.Thread(target=work, daemon=True).start()
+        self.status.set(f"Protection en temps reel active : {', '.join(map(str, folders))}")
+
+    def _show_watch_event(self, event):
+        if event.kind == "erreur":
+            self.status.set(f"{event.path} : {event.message}")
+            return
+        if event.detection:
+            engine = event.detection.engine + (" (suspect)" if event.detection.suspect else "")
+            label = "quarantaine" if event.kind == "quarantaine" else engine
+            item = self.tree.insert("", "end", values=(event.detection.threat, label,
+                                                       str(event.path)))
+            if event.kind != "quarantaine":
+                self.detections[item] = event.detection
+        self.status.set(event.message)
+        messagebox.showwarning("FreeAV - protection en temps reel",
+                               f"{event.message}\n\n{event.path}", parent=self)
+
     def _start_update(self):
         if not updater.load_auth_key():
             key = simpledialog.askstring(
@@ -150,6 +202,13 @@ class App(tk.Tk):
                     self._finish(payload)
                 elif kind == "failed":
                     self._reset_buttons()
+                    self.status.set(payload)
+                    messagebox.showerror("FreeAV", payload)
+                elif kind == "watch":
+                    self._show_watch_event(payload)
+                elif kind == "watch_failed":
+                    self.realtime.set(False)
+                    self.watch_stop = None
                     self.status.set(payload)
                     messagebox.showerror("FreeAV", payload)
                 elif kind == "updated":
@@ -351,6 +410,64 @@ class RepairWindow(tk.Toplevel):
         if messagebox.askyesno("Reparer mon PC", "Annuler la derniere serie de reparations ?",
                                parent=self):
             self._run("undone", lambda: self.repair.undo(system=self.system))
+
+
+class ScheduleWindow(tk.Toplevel):
+    """Active ou retire l'analyse quotidienne et la protection a l'ouverture de session."""
+
+    def __init__(self, app: App):
+        super().__init__(app)
+        self.title("Protection automatique")
+        self.resizable(False, False)
+        self.system = schedule.System()
+        self.at = tk.StringVar(value="12:00")
+        self.realtime = tk.BooleanVar(value=True)
+        self.state = tk.StringVar()
+        body = ttk.Frame(self, padding=14)
+        body.pack(fill="both")
+        ttk.Label(body, wraplength=420, justify="left", text=(
+            "Chaque jour, FreeAV met a jour ses signatures (si une cle abuse.ch est enregistree), "
+            "analyse vos Telechargements et votre Bureau, verifie les points sensibles du PC et "
+            "vous previent en cas de probleme. Aucun droit administrateur n'est necessaire et "
+            "tout se retire en un clic.")).pack(anchor="w")
+        row = ttk.Frame(body, padding=(0, 10, 0, 0))
+        row.pack(fill="x")
+        ttk.Label(row, text="Heure de l'analyse :").pack(side="left")
+        ttk.Entry(row, textvariable=self.at, width=7).pack(side="left", padx=6)
+        ttk.Checkbutton(body, text="Proteger aussi en temps reel a chaque ouverture de session",
+                        variable=self.realtime).pack(anchor="w", pady=6)
+        ttk.Label(body, textvariable=self.state, foreground="#1b6e2d").pack(anchor="w", pady=4)
+        buttons = ttk.Frame(body)
+        buttons.pack(fill="x", pady=(6, 0))
+        ttk.Button(buttons, text="Activer", command=self._install).pack(side="left")
+        ttk.Button(buttons, text="Tout retirer", command=self._remove).pack(side="left", padx=6)
+        ttk.Button(buttons, text="Fermer", command=self.destroy).pack(side="right")
+        self._refresh()
+
+    def _refresh(self):
+        current = schedule.status(self.system)
+        self.state.set("\n".join(f"{name} : {'active' if on else 'inactive'}"
+                                  for name, on in current.items()))
+
+    def _install(self):
+        try:
+            done = schedule.install(self.system, schedule.program_command(self.system),
+                                    at=self.at.get().strip(), realtime=self.realtime.get())
+        except (schedule.ScheduleError, OSError) as exc:
+            messagebox.showerror("FreeAV", str(exc), parent=self)
+            return
+        self._refresh()
+        messagebox.showinfo("FreeAV", "Protection automatique activee :\n- " + "\n- ".join(done),
+                            parent=self)
+
+    def _remove(self):
+        try:
+            done = schedule.remove(self.system)
+        except (schedule.ScheduleError, OSError) as exc:
+            messagebox.showerror("FreeAV", str(exc), parent=self)
+            return
+        self._refresh()
+        messagebox.showinfo("FreeAV", "\n".join(done) or "Rien a retirer.", parent=self)
 
 
 def run():

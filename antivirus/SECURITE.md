@@ -5,8 +5,14 @@
 - **Rien ne quitte votre ordinateur pendant une analyse.** Le scan lit vos fichiers localement et ne
   fait aucune connexion reseau (verifie par le test `test_scan_never_uses_the_network`). Pas de
   telemetrie, pas de compte, pas d'envoi de fichiers "dans le cloud".
-- **Le reseau ne sert qu'a la mise a jour, et seulement quand vous la lancez** (`freeav update` ou le
-  bouton de l'interface). Elle telecharge des empreintes publiques et n'envoie rien sur vous.
+- **Le reseau ne sert qu'a la mise a jour** : quand vous la lancez (`freeav update` ou le bouton de
+  l'interface), ou chaque jour si vous avez active la protection automatique et enregistre une cle
+  abuse.ch. Elle telecharge des empreintes publiques et n'envoie rien sur vous. La protection en
+  temps reel n'utilise pas le reseau.
+- **La protection automatique reste chez vous et se retire en un clic** : une tache planifiee
+  "FreeAV\\Analyse quotidienne" et une entree "FreeAV" au demarrage de votre session, sans droits
+  administrateur, avec une copie de FreeAV dans `%LOCALAPPDATA%\FreeAV`. Le journal
+  `~/.freeav/logs/auto.log` n'est lisible que par vous.
 - **La cle abuse.ch ne sert qu'a abuse.ch** : elle est envoyee uniquement a `mb-api.abuse.ch`
   (dans l'adresse de l'export, comme l'exige leur documentation), en HTTPS, et n'apparait jamais
   dans les messages d'erreur.
@@ -43,8 +49,8 @@
 ## Limites (a lire)
 
 Aucun logiciel ne peut proteger contre toutes les cyberattaques. FreeAV detecte les fichiers deja
-connus (empreintes, regles YARA, ClamAV) : un malware tout nouveau ou cible peut passer. Il n'a pas
-encore de protection en temps reel, et il ne protege pas contre le phishing, les mots de passe voles
+connus (empreintes, regles YARA, ClamAV) : un malware tout nouveau ou cible peut passer. Sa protection en
+temps reel ne surveille que Telechargements et Bureau, apres l'arrivee des fichiers, et il ne protege pas contre le phishing, les mots de passe voles
 ou les failles du systeme. Gardez votre systeme a jour, faites des sauvegardes hors ligne et activez
 la double authentification sur vos comptes.
 
