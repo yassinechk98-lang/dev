@@ -6,7 +6,7 @@ name: FreeAV pour Windows
 # Un lancement manuel avec canal=test publie la branche choisie au lien public.
 on:
   push:
-    branches: [main, antivirus-prototype, freeav-app, freeav-maj, freeav-version]
+    branches: [main, antivirus-prototype, freeav-app, freeav-maj, freeav-version, freeav-rapide]
     paths: ["antivirus/**", ".github/workflows/build-windows.yml"]
   workflow_dispatch:
     inputs:
