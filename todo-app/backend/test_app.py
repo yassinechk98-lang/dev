@@ -15,7 +15,7 @@ def token(client):
     reponse = client.post("/register", json={
         "username": f"test_{suffixe}",
         "email": f"test_{suffixe}@example.com",
-        "password": "motdepasse",
+        "password": "motdepasse-solide-42",
     })
     return reponse.get_json()["token"]
 

@@ -9,6 +9,21 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    # securite.md BD-9 : les tests tournent sur une base PostgreSQL jetable, jamais sur la production
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: todo
+          POSTGRES_PASSWORD: todo
+          POSTGRES_DB: todo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U todo -d todo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -22,14 +37,15 @@ jobs:
       - name: Lance les tests
         run: pytest todo-app/backend/
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          MAILJET_API_KEY: ${{ secrets.MAILJET_API_KEY }}
-          MAILJET_SECRET_KEY: ${{ secrets.MAILJET_SECRET_KEY }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM }}
-          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
-          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          # Valeurs factices : les tests n'appellent ni Mailjet, ni Gemini, ni les services push
+          DATABASE_URL: postgresql://todo:todo@localhost:5432/todo_test
+          SECRET_KEY: cle-de-test-uniquement-pour-la-ci-0123456789abcdef
+          MAILJET_API_KEY: test
+          MAILJET_SECRET_KEY: test
+          MAIL_FROM: test@example.com
+          FRONTEND_URL: https://todo.example.com
+          VAPID_PRIVATE_KEY: test
+          VAPID_PUBLIC_KEY: test
+          CRON_SECRET: secret-cron-de-test
+          GEMINI_API_KEY: test
+          ADMIN_USERNAME: admin_test
