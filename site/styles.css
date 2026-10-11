@@ -250,6 +250,25 @@ footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font
 details:nth-of-type(7){--d:.7s}
 details:nth-of-type(8){--d:.8s}
 
+/* Page Confidentialité */
+.legal{max-width:760px;padding-top:40px;padding-bottom:56px}
+.back{margin:0 0 18px;font-size:15px}
+.back a{text-decoration:none}
+.back a:hover{text-decoration:underline}
+.legal h1{font-size:clamp(30px,5vw,40px);line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+.legal-meta{color:var(--muted);font-size:14px;margin:0 0 24px}
+.legal h2{text-align:left;font-size:22px;margin:36px 0 10px}
+.legal ul{padding-left:22px}
+.legal li{margin:6px 0}
+.legal code{font:14px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1px 6px;overflow-wrap:anywhere}
+.legal-sum{background:var(--accent-soft);border-left:4px solid var(--accent);border-radius:10px;padding:14px 18px}
+.legal-sum p{margin:0}
+.legal .net-list{list-style:none;padding:0;display:grid;gap:10px;margin:16px 0}
+.net-list li{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:0}
+.net-list strong{display:block;margin-bottom:4px}
+.net-list code{display:inline-block;color:var(--accent-strong)}
+.net-list p{margin:8px 0 0;color:var(--muted);font-size:15px}
+
 /* Apparition au défilement */
 .js .reveal{opacity:0}
 .js .reveal.visible{opacity:1;animation:fadeUp .7s cubic-bezier(.2,.7,.2,1) var(--d,0s) backwards}
