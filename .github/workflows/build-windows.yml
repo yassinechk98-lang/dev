@@ -6,7 +6,7 @@ name: FreeAV pour Windows
 # Un lancement manuel avec canal=test publie la branche choisie au lien public.
 on:
   push:
-    branches: [main, antivirus-prototype, freeav-app, freeav-maj]
+    branches: [main, antivirus-prototype, freeav-app, freeav-maj, freeav-version]
     paths: ["antivirus/**", ".github/workflows/build-windows.yml"]
   workflow_dispatch:
     inputs:
@@ -88,17 +88,22 @@ jobs:
           @{ build = [int]$env:GITHUB_RUN_NUMBER; canal = $env:CANAL; commit = $env:GITHUB_SHA } |
             ConvertTo-Json | Set-Content -Encoding utf8NoBOM freeav/data/build.json
           Get-Content freeav/data/build.json
+          python packaging/make_version_info.py $env:GITHUB_RUN_NUMBER packaging/version_info.txt
 
       - name: Construit FreeAV.exe
         run: >
           pyinstaller --noconfirm --onefile --windowed --name FreeAV
-          --icon freeav/data/freeav.ico --paths .
+          --icon freeav/data/freeav.ico --version-file packaging/version_info.txt --paths .
           --add-data "freeav/data;freeav/data"
           packaging/freeav_app.py
 
       - name: Verifie FreeAV.exe (detection et fichier sain)
         shell: pwsh
         run: |
+          $infos = (Get-Item dist/FreeAV.exe).VersionInfo
+          Write-Host "Version Windows : $($infos.ProductName) $($infos.ProductVersion) - $($infos.CompanyName)"
+          if ($infos.ProductName -ne "FreeAV") { Write-Host "::error title=FreeAV.exe::ressource de version absente"; exit 1 }
+          if ($infos.FileVersion -ne "0.1.0.$env:GITHUB_RUN_NUMBER") { Write-Host "::error title=FreeAV.exe::version de fichier inattendue : $($infos.FileVersion)"; exit 1 }
           New-Item -ItemType Directory -Force essai | Out-Null
           Set-Content -NoNewline essai/sain.txt "bonjour"
           $echantillon = Join-Path (Resolve-Path essai) "echantillon.txt"
