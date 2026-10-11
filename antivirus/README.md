@@ -146,3 +146,13 @@ La protection en temps reel verifie les fichiers apres leur arrivee dans les dos
 commercial, et ne surveille pas tout le disque. Aucun antivirus,
 gratuit ou payant, ne detecte toutes les menaces : FreeAV complete les bonnes pratiques
 (mises a jour du systeme, sauvegardes, prudence avec les pieces jointes), il ne les remplace pas.
+
+## Licence
+
+FreeAV est un logiciel libre, sous licence **GNU GPL version 3** (GPL-3.0-only) : texte complet dans
+[LICENSE](LICENSE). Vous pouvez l'utiliser, l'etudier, le modifier et le redistribuer ; une version
+modifiee que vous distribuez doit rester sous la meme licence, avec son code source.
+Cette licence couvre le dossier `antivirus/` uniquement, pas les autres projets du depot.
+
+ClamAV, que FreeAV peut installer a votre demande, est un programme separe de Cisco Talos sous sa
+propre licence (GPLv2) : https://github.com/Cisco-Talos/clamav

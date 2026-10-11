@@ -12,7 +12,7 @@ from freeav import __version__  # noqa: E402
 
 COMPANY = "FreeAV (projet open source)"
 DESCRIPTION = "FreeAV - antivirus gratuit"
-COPYRIGHT = "Copyright (c) 2026 Yassine"
+COPYRIGHT = "Copyright (c) 2026 Yassine - licence GNU GPL v3 (GPL-3.0-only)"
 
 TEMPLATE = """# Genere par packaging/make_version_info.py
 VSVersionInfo(
