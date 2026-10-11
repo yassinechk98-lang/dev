@@ -28,6 +28,8 @@ concurrency:
 
 env:
   CLAMAV_VERSION: "1.4.3"
+  # Empreinte du paquet Windows officiel de Cisco Talos (clamav-1.4.3.win.x64.zip)
+  CLAMAV_SHA256: "5c86a6ed17e45e5c14c9c7c7b58cfaabcdee55a195991439bb6b6c6618827e6c"
   CANAL: ${{ (github.event_name == 'workflow_dispatch' && inputs.canal == 'test' || github.ref_name == 'main' || github.ref_name == 'antivirus-prototype') && 'freeav-test' || 'freeav-apercu' }}
 
 jobs:
@@ -44,7 +46,7 @@ jobs:
           python-version: "3.12"
 
       - name: Installe les outils
-        run: pip install -r requirements-dev.txt -r requirements-build.txt
+        run: pip install -r requirements-build.txt
 
       - name: Recupere ClamAV officiel (Cisco Talos) et verifie son empreinte
         shell: pwsh
@@ -56,13 +58,14 @@ jobs:
             "https://api.github.com/repos/Cisco-Talos/clamav/releases/tags/clamav-$env:CLAMAV_VERSION"
           $asset = $release.assets | Where-Object { $_.name -eq $name }
           if (-not $asset) { Write-Host "::error title=ClamAV::$name introuvable dans la release officielle"; exit 1 }
-          $zip = Join-Path $env:RUNNER_TEMP "FreeAV-ClamAV.zip"
-          Invoke-WebRequest $asset.browser_download_url -OutFile $zip
+          # FreeAV ne republie pas ClamAV : FreeAV.exe le telechargera a cette adresse officielle
+          $url = "https://github.com/Cisco-Talos/clamav/releases/download/clamav-$env:CLAMAV_VERSION/$name"
+          if ($asset.browser_download_url -ne $url) { Write-Host "::error title=ClamAV::adresse inattendue : $($asset.browser_download_url)"; exit 1 }
+          $zip = Join-Path $env:RUNNER_TEMP $name
+          Invoke-WebRequest $url -OutFile $zip
           $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-          if ($asset.digest) {
-            if ($asset.digest -ne "sha256:$sha") { Write-Host "::error title=ClamAV::empreinte differente de celle publiee"; exit 1 }
-          } else { Write-Host "::warning title=ClamAV::GitHub ne publie pas d'empreinte pour $name" }
-          $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:CANAL/FreeAV-ClamAV.zip"
+          if ($sha -ne $env:CLAMAV_SHA256) { Write-Host "::error title=ClamAV::empreinte $sha differente de celle attendue"; exit 1 }
+          if ($asset.digest -and $asset.digest -ne "sha256:$sha") { Write-Host "::error title=ClamAV::empreinte differente de celle publiee par GitHub"; exit 1 }
           @{ version = $env:CLAMAV_VERSION; url = $url; sha256 = $sha } | ConvertTo-Json |
             Set-Content -Encoding utf8NoBOM freeav/data/clamav.json
           "FREEAV_CLAMAV_ZIP=$zip" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
@@ -98,6 +101,8 @@ jobs:
           pyinstaller --noconfirm --onefile --windowed --name FreeAV
           --icon freeav/data/freeav.ico --version-file packaging/version_info.txt --paths .
           --add-data "freeav/data;freeav/data"
+          --add-data "LICENSE;." --add-data "THIRD_PARTY_NOTICES.txt;."
+          --exclude-module bz2 --exclude-module lzma
           packaging/freeav_app.py
 
       - name: Verifie FreeAV.exe (detection et fichier sain)
@@ -194,7 +199,8 @@ jobs:
           if (-not (Test-Path "$HOME\.freeav\logs\auto.log")) { Echec "journal de l'entretien absent" }
           $global:LASTEXITCODE = 0
           (Get-FileHash dist/FreeAV.exe -Algorithm SHA256).Hash.ToLower() + "  FreeAV.exe" | Set-Content dist/FreeAV.exe.sha256
-          Copy-Item $env:FREEAV_CLAMAV_ZIP dist/FreeAV-ClamAV.zip
+          Copy-Item LICENSE dist/LICENSE.txt
+          Copy-Item THIRD_PARTY_NOTICES.txt dist/THIRD_PARTY_NOTICES.txt
           # Fichier de version lu par FreeAV pour proposer ses mises a jour
           @{ build = [int]$env:GITHUB_RUN_NUMBER; commit = $env:GITHUB_SHA
              sha256 = (Get-FileHash dist/FreeAV.exe -Algorithm SHA256).Hash.ToLower()
@@ -202,13 +208,17 @@ jobs:
              url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:CANAL/FreeAV.exe" } |
             ConvertTo-Json | Set-Content -Encoding utf8NoBOM dist/FreeAV.json
 
+      - name: Verifie les mentions des licences tierces
+        run: python packaging/check_notices.py dist/FreeAV.exe THIRD_PARTY_NOTICES.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: FreeAV-windows
           path: |
+            antivirus/dist/LICENSE.txt
+            antivirus/dist/THIRD_PARTY_NOTICES.txt
             antivirus/dist/FreeAV.exe
             antivirus/dist/FreeAV.exe.sha256
-            antivirus/dist/FreeAV-ClamAV.zip
             antivirus/dist/FreeAV.json
 
   publish:
@@ -242,8 +252,12 @@ jobs:
             echo "Cliquez sur « Informations complementaires » puis « Executer quand meme »."
             echo "Empreinte SHA-256 : $(cut -d' ' -f1 FreeAV.exe.sha256)"
             echo
-            echo "FreeAV-ClamAV.zip : moteur ClamAV ${CLAMAV_VERSION} officiel (Cisco Talos, GPLv2), telecharge par FreeAV quand vous cliquez sur « Installer ClamAV ». Code source de ClamAV : https://github.com/Cisco-Talos/clamav"
+            echo "FreeAV est un logiciel libre (GPL-3.0-or-later, voir LICENSE.txt). Code source de cette version : https://github.com/${GH_REPO}/tree/${{ github.sha }}/antivirus"
+            echo "Licences des logiciels tiers inclus dans FreeAV.exe : THIRD_PARTY_NOTICES.txt"
+            echo
+            echo "ClamAV n'est pas fourni ici : « Installer ClamAV » telecharge ClamAV ${CLAMAV_VERSION} directement depuis la release officielle de Cisco Talos (GPL-2.0, code source : https://github.com/Cisco-Talos/clamav/releases/tag/clamav-${CLAMAV_VERSION}), sans son module RAR non libre."
+            echo "Les anciennes copies de FreeAV cherchaient ClamAV ici et ne le trouvent plus : si « Installer ClamAV » echoue, mettez d'abord FreeAV a jour (« Mettre a jour FreeAV ») ou retelechargez-le."
           } > notes.md
-          gh release create "$CANAL" FreeAV.exe FreeAV.exe.sha256 FreeAV-ClamAV.zip FreeAV.json \
+          gh release create "$CANAL" FreeAV.exe FreeAV.exe.sha256 FreeAV.json LICENSE.txt THIRD_PARTY_NOTICES.txt \
             --prerelease --target "${{ github.sha }}" \
             --title "$TITLE" --notes-file notes.md

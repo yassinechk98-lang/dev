@@ -212,9 +212,11 @@ class App(tk.Tk):
     def _clamav_action(self):
         ready = self.local_clamav.ready()
         if not ready and not messagebox.askyesno(
-                "ClamAV", "Installer le moteur antivirus ClamAV (Cisco Talos, gratuit et open "
-                "source) ?\n\nFreeAV telecharge ClamAV puis ses signatures officielles "
-                "(environ 300 Mo). Les analyses deviennent plus completes et plus longues.",
+                "ClamAV", "Installer le moteur antivirus ClamAV (Cisco Talos, gratuit, licence "
+                "GPL-2.0) ?\n\nFreeAV telecharge ClamAV depuis le site officiel de Cisco Talos, "
+                "puis ses signatures officielles (environ 300 Mo). Les analyses deviennent plus "
+                "completes et plus longues.\n\nLe module RAR de ClamAV, dont la licence n'est "
+                "pas libre, n'est pas installe : l'interieur des archives RAR n'est pas analyse.",
                 parent=self):
             return
         self.clamav_btn.state(["disabled"])
