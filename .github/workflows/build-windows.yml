@@ -97,6 +97,43 @@ jobs:
           --add-data "freeav/data;freeav/data"
           packaging/freeav_app.py
 
+      - name: Fait analyser FreeAV.exe par Microsoft Defender
+        shell: pwsh
+        run: |
+          # Defender du serveur, avec ses signatures a jour, analyse l'exe construit. On verifie
+          # d'abord sur le fichier de test EICAR qu'il detecte vraiment, sinon le verdict ne vaut rien.
+          $mp = Get-ChildItem "$env:ProgramData\Microsoft\Windows Defender\Platform\*\MpCmdRun.exe" -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $mp) { $mp = "$env:ProgramFiles\Windows Defender\MpCmdRun.exe" }
+          & $mp -SignatureUpdate | Out-Null
+          $signatures = try { (Get-MpComputerStatus).AntivirusSignatureVersion } catch { "inconnues" }
+          $eicar = Join-Path $env:RUNNER_TEMP "essai-defender.com"
+          $texte = 'X5O!P%@AP[4\PZX54(P^)7CC)7}$' + 'EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*'
+          try { [IO.File]::WriteAllText($eicar, $texte) } catch { }
+          Start-Sleep -Seconds 2
+          $detecte = -not (Test-Path $eicar)
+          if (-not $detecte) { & $mp -Scan -ScanType 3 -File $eicar -DisableRemediation | Out-Null; $detecte = $LASTEXITCODE -eq 2 }
+          Remove-Item $eicar -ErrorAction SilentlyContinue
+          $exe = (Resolve-Path dist/FreeAV.exe).Path
+          $sortie = & $mp -Scan -ScanType 3 -File $exe -DisableRemediation
+          $code = $LASTEXITCODE
+          $sortie | Write-Host
+          if (-not $detecte) {
+            $verdict = "Microsoft Defender : non verifie (Defender inactif sur le serveur de construction)"
+            Write-Host "::warning title=Microsoft Defender::Defender ne detecte pas EICAR ici, verdict non fiable"
+          } elseif ($code -eq 0) {
+            $verdict = "Microsoft Defender (signatures $signatures) : aucune menace detectee dans FreeAV.exe"
+          } else {
+            $menace = ($sortie | Select-String -Pattern 'Threat\s*:\s*(.+)$' | Select-Object -First 1).Matches.Groups[1].Value
+            $verdict = "Microsoft Defender (signatures $signatures) : FreeAV.exe signale ($menace, code $code)"
+            Write-Host "::warning title=Microsoft Defender::$verdict"
+          }
+          Write-Host $verdict
+          "### $verdict" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Set-Content -Encoding utf8NoBOM dist/defender.txt $verdict
+          $global:LASTEXITCODE = 0  # un signalement est rapporte, il ne bloque pas la construction
+
       - name: Verifie FreeAV.exe (detection et fichier sain)
         shell: pwsh
         run: |
@@ -207,6 +244,7 @@ jobs:
             antivirus/dist/FreeAV.exe.sha256
             antivirus/dist/FreeAV-ClamAV.zip
             antivirus/dist/FreeAV.json
+            antivirus/dist/defender.txt
 
   publish:
     needs: build
@@ -238,6 +276,8 @@ jobs:
             echo "Le fichier n'est pas signe : Windows SmartScreen peut afficher « Windows a protege votre ordinateur »."
             echo "Cliquez sur « Informations complementaires » puis « Executer quand meme »."
             echo "Empreinte SHA-256 : $(cut -d' ' -f1 FreeAV.exe.sha256)"
+            echo
+            echo "$(cat defender.txt 2>/dev/null || echo 'Microsoft Defender : pas de verdict')"
             echo
             echo "FreeAV-ClamAV.zip : moteur ClamAV ${CLAMAV_VERSION} officiel (Cisco Talos, GPLv2), telecharge par FreeAV quand vous cliquez sur « Installer ClamAV ». Code source de ClamAV : https://github.com/Cisco-Talos/clamav"
           } > notes.md

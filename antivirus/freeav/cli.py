@@ -91,6 +91,15 @@ def build_scanner(args, realtime: bool = False) -> Scanner:
 
 
 def cmd_scan(args) -> int:
+    extra_exclude: set[Path] = set()
+    if args.quick:
+        from .quickscan import quick_exclusions, quick_targets
+        args.paths = [str(p) for p in quick_targets()] + list(args.paths)
+        extra_exclude = quick_exclusions()
+        print("Analyse rapide : " + ", ".join(args.paths))
+    if not args.paths:
+        print("Erreur : indiquez un fichier ou un dossier, ou --quick", file=sys.stderr)
+        return 2
     missing = [p for p in args.paths if not Path(p).exists()]
     if missing:
         print(f"Erreur : chemin introuvable : {', '.join(missing)}", file=sys.stderr)
@@ -107,7 +116,7 @@ def cmd_scan(args) -> int:
           + (", moteur ClamAV actif" if scanner.clamd else "")
           + "".join(f", {names.get(e.name, e.name)} actif" for e in scanner.batch_engines))
     report = scanner.scan([Path(p) for p in args.paths],
-                          exclude=scan_exclusions(quarantine.directory, args.yara))
+                          exclude=scan_exclusions(quarantine.directory, args.yara) | extra_exclude)
 
     failed = 0
     for det in report.detections:
@@ -542,7 +551,10 @@ def main(argv: list[str] | None = None) -> int:
                        help="ne pas utiliser le ClamAV integre")
 
     scan = sub.add_parser("scan", help="analyser des fichiers ou dossiers")
-    scan.add_argument("paths", nargs="+")
+    scan.add_argument("paths", nargs="*")
+    scan.add_argument("--quick", action="store_true",
+                      help="analyse rapide des endroits a risque (Telechargements, Bureau, "
+                           "dossier temporaire, programmes lances au demarrage)")
     engine_options(scan)
     scan.add_argument("--quarantine", action="store_true",
                       help="mettre les fichiers infectes en quarantaine")

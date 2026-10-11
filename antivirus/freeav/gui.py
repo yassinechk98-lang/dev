@@ -90,8 +90,10 @@ class App(tk.Tk):
 
         actions = ttk.Frame(self, padding=(10, 0))
         actions.pack(fill="x")
-        self.scan_btn = ttk.Button(actions, text="Analyser", command=self._start_scan)
-        self.scan_btn.pack(side="left")
+        self.quick_btn = ttk.Button(actions, text="Analyse rapide", command=self._start_quick_scan)
+        self.quick_btn.pack(side="left")
+        self.scan_btn = ttk.Button(actions, text="Analyser ce dossier", command=self._start_scan)
+        self.scan_btn.pack(side="left", padx=6)
         self.stop_btn = ttk.Button(actions, text="Arreter", command=self.stop_flag.set,
                                    state="disabled")
         self.stop_btn.pack(side="left", padx=6)
@@ -146,20 +148,27 @@ class App(tk.Tk):
         if folder:
             self.target.set(folder)
 
-    def _start_scan(self):
-        target = Path(self.target.get())
-        if not target.exists():
-            messagebox.showerror("FreeAV", f"Chemin introuvable :\n{target}")
-            return
+    def _start_quick_scan(self):
+        from .quickscan import quick_targets
+        self._start_scan(quick_targets())
+
+    def _start_scan(self, targets: list[Path] | None = None):
+        if targets is None:
+            target = Path(self.target.get())
+            if not target.exists():
+                messagebox.showerror("FreeAV", f"Chemin introuvable :\n{target}")
+                return
+            targets = [target]
         self.tree.delete(*self.tree.get_children())
         self.stop_flag.clear()
         self.scan_btn.config(state="disabled")
+        self.quick_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
         self.progress.start(12)
-        self.worker = threading.Thread(target=self._run_scan, args=(target,), daemon=True)
+        self.worker = threading.Thread(target=self._run_scan, args=(targets,), daemon=True)
         self.worker.start()
 
-    def _run_scan(self, target: Path):
+    def _run_scan(self, targets: list[Path]):
         try:
             clamd = None
             if self.use_clamav.get():
@@ -169,8 +178,9 @@ class App(tk.Tk):
                     clamd = None
             scanner = Scanner(load_default(), clamd, yara=build_yara([]),
                               batch_engines=batch_engines(defender=self.use_defender.get()))
+            from .quickscan import quick_exclusions
             report = scanner.scan(
-                [target], exclude=scan_exclusions(self.quarantine.directory, []),
+                targets, exclude=scan_exclusions(self.quarantine.directory, []) | quick_exclusions(),
                 on_file=lambda p: self.events.put(("file", p)),
                 should_stop=self.stop_flag.is_set,
                 on_engine=lambda name: self.events.put(
@@ -432,6 +442,7 @@ class App(tk.Tk):
     def _reset_buttons(self):
         self.progress.stop()
         self.scan_btn.config(state="normal")
+        self.quick_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
 
     def _finish(self, report):

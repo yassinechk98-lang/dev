@@ -52,6 +52,9 @@ est optionnel (`pip install -r requirements-optional.txt`). Python 3.10 ou plus 
   protection en temps reel et redemarre FreeAV. Rien ne change sans votre accord. La verification
   contacte github.com ; elle se coupe avec la case « Chercher les nouvelles versions » ou
   `FreeAV.exe app-update --auto-check off`.
+- **Analyse rapide** (bouton **Analyse rapide**, ou `freeav scan --quick`) : Telechargements, Bureau,
+  dossier temporaire, dossiers Demarrage et programmes lances a l'ouverture de session, la ou les
+  malwares arrivent ou s'installent le plus souvent, en quelques minutes.
 - **Ligne de commande** et **interface graphique** (Tkinter), avec un bandeau qui dit en un coup
   d'oeil si le PC est protege.
 
