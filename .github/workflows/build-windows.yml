@@ -273,11 +273,11 @@ jobs:
             echo
             echo "Telechargement direct : ${URL}"
             echo
+            echo "$(cat defender.txt 2>/dev/null || echo 'Microsoft Defender : pas de verdict')"
+            echo
             echo "Le fichier n'est pas signe : Windows SmartScreen peut afficher « Windows a protege votre ordinateur »."
             echo "Cliquez sur « Informations complementaires » puis « Executer quand meme »."
             echo "Empreinte SHA-256 : $(cut -d' ' -f1 FreeAV.exe.sha256)"
-            echo
-            echo "$(cat defender.txt 2>/dev/null || echo 'Microsoft Defender : pas de verdict')"
             echo
             echo "FreeAV-ClamAV.zip : moteur ClamAV ${CLAMAV_VERSION} officiel (Cisco Talos, GPLv2), telecharge par FreeAV quand vous cliquez sur « Installer ClamAV ». Code source de ClamAV : https://github.com/Cisco-Talos/clamav"
           } > notes.md
