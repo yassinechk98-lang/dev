@@ -61,6 +61,8 @@ class App(tk.Tk):
         self._refresh_engines()
         self._refresh_header()
         self.after(100, self._poll)
+        self.app_update = None
+        threading.Thread(target=self._check_app_update, daemon=True).start()
         if scan:  # "Analyser avec FreeAV" depuis le clic droit de l'Explorateur
             self.after(400, self._start_scan)
 
@@ -227,6 +229,58 @@ class App(tk.Tk):
 
         threading.Thread(target=work, daemon=True).start()
 
+    def _check_app_update(self):
+        from . import selfupdate
+        try:
+            release = selfupdate.check()
+        except Exception:
+            return  # pas de reseau : on reessaiera au prochain demarrage
+        if release:
+            self.events.put(("app_update", release))
+
+    def _show_app_update(self, release):
+        self.app_update = release
+        self.app_update_btn = ttk.Button(self.banner, text="Mettre a jour FreeAV",
+                                         command=self._apply_app_update)
+        self.app_update_btn.pack(side="right", padx=6)
+        self.status.set(f"Une nouvelle version de FreeAV est disponible (version {self.app_update.build}).")
+
+    def _apply_app_update(self):
+        from . import selfupdate
+        from .repair import System
+        if not messagebox.askyesno(
+                "FreeAV", "Installer la nouvelle version de FreeAV ?\n\nElle est telechargee "
+                "depuis la page officielle de FreeAV sur GitHub et verifiee (empreinte SHA-256) "
+                "avant de remplacer l'ancienne. FreeAV redemarre ensuite.", parent=self):
+            return
+        if self.worker and self.worker.is_alive():
+            messagebox.showinfo("FreeAV", "Attendez la fin de l'analyse en cours.", parent=self)
+            return
+        self.app_update_btn.state(["disabled"])
+        release = self.app_update
+
+        def work():
+            system = System()
+            try:
+                selfupdate.apply(release, system,
+                                 progress=lambda m: self.events.put(("status", m)))
+                self.events.put(("app_updated", str(selfupdate.update_target(system))))
+            except Exception as exc:
+                self.events.put(("app_update_failed", f"Mise a jour impossible : {exc}"))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _restart(self, exe: str):
+        from . import selfupdate
+        messagebox.showinfo("FreeAV", "FreeAV est a jour. Il va redemarrer.", parent=self)
+        try:
+            selfupdate.start_detached([exe])
+        except Exception as exc:
+            messagebox.showwarning("FreeAV", f"Rouvrez FreeAV vous-meme ({exc}).", parent=self)
+        if self.watch_stop:
+            self.watch_stop.set()
+        self.destroy()
+
     def _install_app(self):
         from . import installer
         from .repair import System
@@ -337,6 +391,15 @@ class App(tk.Tk):
                     messagebox.showinfo("FreeAV", payload)
                 elif kind == "installed":
                     messagebox.showinfo("FreeAV", payload)
+                elif kind == "app_update":
+                    self._show_app_update(payload)
+                elif kind == "app_updated":
+                    self._restart(payload)
+                    return
+                elif kind == "app_update_failed":
+                    self.app_update_btn.state(["!disabled"])
+                    self.status.set(payload)
+                    messagebox.showerror("FreeAV", payload)
                 elif kind == "watch":
                     self._show_watch_event(payload)
                 elif kind == "watch_failed":

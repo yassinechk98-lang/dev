@@ -34,6 +34,8 @@ def _console_streams() -> None:
 
 
 if __name__ == "__main__":
+    from freeav.selfupdate import cleanup_old
+    cleanup_old()  # anciennes versions laissees par une mise a jour
     if len(sys.argv) > 1:
         _console_streams()
         from freeav.cli import main
