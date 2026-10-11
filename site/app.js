@@ -94,6 +94,50 @@
     startWhenVisible(auto, autoCycle, autoFinal);
   }
 
+  // Démo « Nouveautés » : bandeau, ClamAV en un clic, mise à jour de FreeAV
+  var app = document.getElementById('appDemo');
+  if (app) {
+    var a = {};
+    app.querySelectorAll('[data-a]').forEach(function(n){ a[n.getAttribute('data-a')] = n; });
+    var later = function(ms, fn){ setTimeout(fn, ms); };
+    var press = function(n){ n.classList.add('press'); later(300, function(){ n.classList.remove('press'); }); };
+    var OK = 'Votre PC est protégé';
+    var clamReady = function(){
+      app.classList.remove('inst', 'fill');
+      app.classList.add('clam-ok');
+      a.clam.textContent = '+ ClamAV intégré : prêt';
+      a.clamBtn.textContent = 'Mettre à jour ClamAV';
+    };
+    var appFinal = function(){
+      app.classList.remove('warn');
+      app.classList.add('upd');
+      a.rt.classList.add('on');
+      a.banner.textContent = OK;
+      clamReady();
+      a.note.textContent = 'Une nouvelle version de FreeAV est disponible';
+    };
+    var appCycle = function(){
+      app.classList.remove('upd', 'clam-ok', 'inst', 'fill');
+      app.classList.add('warn');
+      a.rt.classList.remove('on');
+      a.banner.textContent = 'Protection en temps réel désactivée';
+      a.clam.textContent = '+ ClamAV intégré : non installé';
+      a.clamBtn.textContent = 'Installer ClamAV (gratuit)';
+      a.note.textContent = '';
+      later(1200, function(){ press(a.rt); a.rt.classList.add('on'); app.classList.remove('warn'); a.banner.textContent = OK; });
+      later(2800, function(){ press(a.clamBtn); });
+      later(3150, function(){ app.classList.add('inst'); a.clam.textContent = '+ ClamAV : installation…'; });
+      later(3250, function(){ app.classList.add('fill'); });
+      later(5600, clamReady);
+      later(7000, function(){ app.classList.add('upd'); a.note.textContent = 'Une nouvelle version de FreeAV est disponible'; });
+      later(8400, function(){ press(a.upd); });
+      later(8750, function(){ a.note.textContent = 'Téléchargement et vérification de la nouvelle version…'; });
+      later(10300, function(){ app.classList.remove('upd'); a.note.textContent = 'FreeAV a redémarré : il est à jour'; });
+      later(14000, appCycle);
+    };
+    startWhenVisible(app, appCycle, appFinal);
+  }
+
   // Démo « Réparer mon PC » : diagnostic puis réparations, en boucle
   var rd = document.getElementById('repairDemo');
   if (rd) {
