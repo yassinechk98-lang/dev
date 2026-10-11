@@ -39,7 +39,41 @@ def build_yara(extra: list[str]) -> yara_engine.YaraEngine | None:
     return engine
 
 
-def build_scanner(args) -> Scanner:
+def scan_argument(value: str | None) -> str | None:
+    """Clic droit sur un lecteur : Windows passe "E:\\" et la ligne --scan "E:\\" se lit E:"
+    (le \\" final est un guillemet echappe). On remet la barre."""
+    if value and value.endswith('"'):
+        value = value[:-1] + "\\"
+    return value
+
+
+def batch_engines(defender: bool = False, clamav: bool = True) -> list:
+    """Moteurs complets en plus des signatures FreeAV : ClamAV integre (s'il est installe)
+    et, sur demande, Microsoft Defender en deuxieme avis.
+
+    En administrateur, ClamAV integre n'est pas lance : il est installe dans un dossier de
+    l'utilisateur, modifiable sans droits, et ne doit pas tourner avec des droits eleves."""
+    from .quarantine import _is_elevated
+    engines = []
+    if clamav and _is_elevated():
+        print("Attention : en administrateur, ClamAV integre n'est pas utilise "
+              "(lancez FreeAV normalement).", file=sys.stderr)
+        clamav = False
+    if clamav:
+        from .clamav_local import ClamscanEngine, LocalClamav
+        local = LocalClamav()
+        if local.ready():
+            engines.append(ClamscanEngine(local))
+    if defender:
+        from .defender import DefenderEngine, DefenderError
+        try:
+            engines.append(DefenderEngine())
+        except DefenderError as exc:
+            print(f"Attention : {exc}, deuxieme avis desactive.", file=sys.stderr)
+    return engines
+
+
+def build_scanner(args, realtime: bool = False) -> Scanner:
     db = load_default([Path(p) for p in args.db])
     clamd = None
     if args.clamav:
@@ -49,7 +83,10 @@ def build_scanner(args) -> Scanner:
             print("Attention : clamd injoignable, analyse par signatures uniquement.",
                   file=sys.stderr)
             clamd = None
-    return Scanner(db, clamd, yara=build_yara(args.yara))
+    # En temps reel, ClamAV integre (lent a demarrer) est laisse a l'analyse complete.
+    engines = batch_engines(defender=getattr(args, "defender", False),
+                            clamav=not realtime and not getattr(args, "no_clamav", False))
+    return Scanner(db, clamd, yara=build_yara(args.yara), batch_engines=engines)
 
 
 def cmd_scan(args) -> int:
@@ -63,9 +100,11 @@ def cmd_scan(args) -> int:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 2
     quarantine = Quarantine(Path(args.quarantine_dir))
+    names = {"clamav": "ClamAV integre", "defender": "Microsoft Defender"}
     print(f"FreeAV {__version__} : {len(scanner.db)} signatures chargees"
           + (f", {len(scanner.yara)} fichiers de regles YARA" if scanner.yara else "")
-          + (", moteur ClamAV actif" if scanner.clamd else ""))
+          + (", moteur ClamAV actif" if scanner.clamd else "")
+          + "".join(f", {names.get(e.name, e.name)} actif" for e in scanner.batch_engines))
     report = scanner.scan([Path(p) for p in args.paths],
                           exclude=scan_exclusions(quarantine.directory, args.yara))
 
@@ -228,7 +267,7 @@ def cmd_watch(args) -> int:
         print("Erreur : aucun dossier a surveiller.", file=sys.stderr)
         return 2
     try:
-        scanner = build_scanner(args)
+        scanner = build_scanner(args, realtime=True)
     except (ClamdError, ValueError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 2
@@ -237,12 +276,12 @@ def cmd_watch(args) -> int:
     def on_event(event: watcher.WatchEvent) -> None:
         print(f"{time.strftime('%H:%M:%S')} {event.kind.upper():11} {event.path} : {event.message}",
               flush=True)
-        if args.notify and event.kind != "erreur":
+        if args.notify and event.kind not in ("erreur", "usb"):
             watcher.notify("FreeAV - protection en temps reel", f"{event.message}\n\n{event.path}")
 
     watch = watcher.FolderWatcher(scanner, folders, quarantine,
                                   exclude=scan_exclusions(Path(args.quarantine_dir), args.yara),
-                                  on_event=on_event)
+                                  on_event=on_event, removable_drives=watcher.removable_drives)
     print(f"Protection en temps reel active sur : {', '.join(map(str, folders))} "
           "(Ctrl+C pour arreter)", flush=True)
     stop = threading.Event()
@@ -319,6 +358,90 @@ def cmd_auto(args) -> int:
     return 1 if alerts else 0
 
 
+def cmd_clamav(args) -> int:
+    from .clamav_local import ClamavError, LocalClamav, manifest
+
+    local = LocalClamav()
+    try:
+        if args.remove:
+            local.uninstall()
+            print("ClamAV integre supprime.")
+        elif args.install:
+            local.install(progress=lambda message: print(message, flush=True))
+            print("ClamAV est installe et a jour : il sera utilise a chaque analyse.")
+        elif args.update:
+            print(local.update(progress=lambda message: print(message, flush=True)))
+        else:
+            info = manifest()
+            state = ("pret" if local.ready() else "installe, sans signatures" if local.installed()
+                     else "non installe")
+            print(f"ClamAV integre : {state} ({local.root})")
+            if not local.installed():
+                print("Installation : freeav clamav --install" if info else
+                      "Cette version de FreeAV ne propose pas l'installation de ClamAV.")
+    except (ClamavError, OSError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def _dialog(kind: str, title: str, message: str) -> bool:
+    """Boite de dialogue Windows (FreeAV.exe n'a pas de console quand on le lance depuis
+    Parametres > Applications ou un raccourci)."""
+    try:
+        import tkinter
+        from tkinter import messagebox
+        root = tkinter.Tk()
+        root.withdraw()
+        try:
+            return bool(getattr(messagebox, kind)(title, message, parent=root))
+        finally:
+            root.destroy()
+    except Exception:
+        return kind != "askyesno"
+
+
+def cmd_install(args) -> int:
+    from . import installer
+    from .repair import System
+
+    try:
+        done = installer.install(System())
+    except (installer.InstallError, OSError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        if not args.quiet:
+            _dialog("showerror", "FreeAV", f"Installation impossible : {exc}")
+        return 2
+    message = "FreeAV est installe :\n" + "\n".join(f"  - {d}" for d in done)
+    print(message)
+    if not args.quiet:
+        _dialog("showinfo", "FreeAV", message)
+    return 0
+
+
+def cmd_uninstall(args) -> int:
+    from . import installer
+    from .repair import System
+
+    if not args.yes and not _dialog(
+            "askyesno", "Desinstaller FreeAV",
+            "Desinstaller FreeAV de ce PC ?\n\nLa protection automatique, les raccourcis, le "
+            "clic droit et le moteur ClamAV integre seront retires. Votre quarantaine est gardee."):
+        return 1
+    try:
+        done = installer.uninstall(System())
+    except (installer.InstallError, OSError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        if not args.yes:
+            _dialog("showerror", "FreeAV", f"Desinstallation incomplete : {exc}")
+        return 2
+    message = "FreeAV est desinstalle :\n" + "\n".join(f"  - {d}" for d in done)
+    print(message)
+    if not args.yes:
+        _dialog("showinfo", "FreeAV", message)
+    return 0
+
+
 def cmd_schedule(args) -> int:
     from . import schedule
     from .repair import System
@@ -349,20 +472,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quarantine-dir", default=str(DEFAULT_DIR))
     sub = parser.add_subparsers(dest="command", required=True)
 
+    def engine_options(p):
+        p.add_argument("--db", action="append", default=[],
+                       help="base de signatures supplementaire (.txt, .hdb, .hsb)")
+        p.add_argument("--clamav", action="store_true", help="utiliser aussi le demon clamd")
+        p.add_argument("--clamd-socket", help="socket Unix de clamd")
+        p.add_argument("--clamd-host", default="127.0.0.1")
+        p.add_argument("--clamd-port", type=int, default=3310)
+        p.add_argument("--allow-remote-clamd", action="store_true",
+                       help="autoriser un clamd sur une autre machine (vos fichiers y seront envoyes)")
+        p.add_argument("--yara", action="append", default=[], metavar="DOSSIER",
+                       help="regles YARA (.yar) a appliquer, en plus de ~/.freeav/yara")
+        p.add_argument("--defender", action="store_true",
+                       help="deuxieme avis de Microsoft Defender (Windows)")
+        p.add_argument("--no-clamav", action="store_true",
+                       help="ne pas utiliser le ClamAV integre")
+
     scan = sub.add_parser("scan", help="analyser des fichiers ou dossiers")
     scan.add_argument("paths", nargs="+")
-    scan.add_argument("--db", action="append", default=[],
-                      help="base de signatures supplementaire (.txt, .hdb, .hsb)")
+    engine_options(scan)
     scan.add_argument("--quarantine", action="store_true",
                       help="mettre les fichiers infectes en quarantaine")
-    scan.add_argument("--clamav", action="store_true", help="utiliser aussi le demon clamd")
-    scan.add_argument("--clamd-socket", help="socket Unix de clamd")
-    scan.add_argument("--clamd-host", default="127.0.0.1")
-    scan.add_argument("--clamd-port", type=int, default=3310)
-    scan.add_argument("--allow-remote-clamd", action="store_true",
-                      help="autoriser un clamd sur une autre machine (vos fichiers y seront envoyes)")
-    scan.add_argument("--yara", action="append", default=[], metavar="DOSSIER",
-                      help="regles YARA (.yar) a appliquer, en plus de ~/.freeav/yara")
     scan.set_defaults(func=cmd_scan)
 
     quar = sub.add_parser("quarantine", help="gerer la quarantaine")
@@ -389,18 +519,6 @@ def main(argv: list[str] | None = None) -> int:
                      help="confirmer les actions definitives (nettoyage, outils Windows)")
     rep.set_defaults(func=cmd_repair)
 
-    def engine_options(p):
-        p.add_argument("--db", action="append", default=[],
-                       help="base de signatures supplementaire (.txt, .hdb, .hsb)")
-        p.add_argument("--clamav", action="store_true", help="utiliser aussi le demon clamd")
-        p.add_argument("--clamd-socket", help="socket Unix de clamd")
-        p.add_argument("--clamd-host", default="127.0.0.1")
-        p.add_argument("--clamd-port", type=int, default=3310)
-        p.add_argument("--allow-remote-clamd", action="store_true",
-                       help="autoriser un clamd sur une autre machine (vos fichiers y seront envoyes)")
-        p.add_argument("--yara", action="append", default=[], metavar="DOSSIER",
-                       help="regles YARA (.yar) a appliquer, en plus de ~/.freeav/yara")
-
     watch = sub.add_parser("watch", help="protection en temps reel (Telechargements, Bureau)")
     watch.add_argument("folders", nargs="*", help="dossiers a surveiller")
     engine_options(watch)
@@ -415,6 +533,13 @@ def main(argv: list[str] | None = None) -> int:
     auto.add_argument("--notify", action="store_true", help="afficher une alerte Windows")
     auto.set_defaults(func=cmd_auto)
 
+    clam = sub.add_parser("clamav", help="moteur ClamAV integre (Windows)")
+    clam_group = clam.add_mutually_exclusive_group()
+    clam_group.add_argument("--install", action="store_true", help="installer ClamAV et ses signatures")
+    clam_group.add_argument("--update", action="store_true", help="mettre a jour les signatures")
+    clam_group.add_argument("--remove", action="store_true", help="supprimer ClamAV integre")
+    clam.set_defaults(func=cmd_clamav)
+
     sched = sub.add_parser("schedule", help="installer la protection automatique (Windows)")
     sched.add_argument("--at", default="12:00", metavar="HH:MM",
                        help="heure de l'analyse quotidienne (12:00 par defaut)")
@@ -424,8 +549,17 @@ def main(argv: list[str] | None = None) -> int:
     sched.add_argument("--status", action="store_true", help="voir ce qui est installe")
     sched.set_defaults(func=cmd_schedule)
 
+    inst = sub.add_parser("install", help="installer FreeAV sur ce PC (Windows)")
+    inst.add_argument("--quiet", action="store_true", help="sans fenetre de confirmation")
+    inst.set_defaults(func=cmd_install)
+    uninst = sub.add_parser("uninstall", help="desinstaller FreeAV (Windows)")
+    uninst.add_argument("--yes", action="store_true", help="sans confirmation")
+    uninst.set_defaults(func=cmd_uninstall)
+
     gui = sub.add_parser("gui", help="ouvrir l'interface graphique")
-    gui.set_defaults(func=lambda _args: __import__("freeav.gui", fromlist=["run"]).run())
+    gui.add_argument("--scan", metavar="CHEMIN", help="analyser tout de suite ce fichier ou dossier")
+    gui.set_defaults(func=lambda a: __import__("freeav.gui", fromlist=["run"]).run(
+        scan=scan_argument(a.scan)))
 
     args = parser.parse_args(argv)
     return args.func(args) or 0

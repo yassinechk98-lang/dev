@@ -33,7 +33,7 @@ def default_folders(home: Path | None = None) -> list[Path]:
 
 @dataclass
 class WatchEvent:
-    kind: str            # "menace", "suspect", "quarantaine", "erreur"
+    kind: str            # "menace", "suspect", "quarantaine", "usb", "erreur"
     path: Path
     message: str
     detection: Detection | None = None
@@ -69,8 +69,12 @@ def _snapshot(folders: list[Path], exclude: set[Path]) -> dict[Path, tuple]:
 class FolderWatcher:
     def __init__(self, scanner: Scanner, folders: list[Path], quarantine: Quarantine | None = None,
                  exclude: set[Path] | None = None,
-                 on_event: Callable[[WatchEvent], None] | None = None):
+                 on_event: Callable[[WatchEvent], None] | None = None,
+                 removable_drives: Callable[[], set[str]] | None = None):
         self.scanner = scanner
+        # Cles USB et cartes memoire : analysees entierement des qu'elles sont branchees.
+        self.removable_drives = removable_drives
+        self._drives = set(removable_drives()) if removable_drives else set()
         self.folders = [Path(f) for f in folders]
         self.quarantine = quarantine
         self.exclude = set(exclude or set())
@@ -79,11 +83,22 @@ class FolderWatcher:
         self.on_event = on_event or (lambda event: None)
         self._known = _snapshot(self.folders, self.exclude)  # deja presents : pas re-analyses
         self._pending: dict[Path, tuple] = {}
+        self._drive_scans: list[threading.Thread] = []
         self.scanned = 0
 
     def poll(self) -> list[WatchEvent]:
         """Un tour de surveillance. Retourne les evenements produits."""
         events: list[WatchEvent] = []
+        if self.removable_drives:
+            drives = set(self.removable_drives())
+            for drive in sorted(drives - self._drives):
+                # En arriere-plan : Telechargements et Bureau restent surveilles pendant
+                # l'analyse d'une grosse cle.
+                scan = threading.Thread(target=self._scan_drive, args=(drive,), daemon=True)
+                scan.start()
+                self._drive_scans.append(scan)
+            self._drives = drives
+            self._drive_scans = [t for t in self._drive_scans if t.is_alive()]
         current = _snapshot(self.folders, self.exclude)
         for path, sig in current.items():
             if self._known.get(path) == sig:
@@ -104,6 +119,40 @@ class FolderWatcher:
         for event in events:
             self.on_event(event)
         return events
+
+    def _scan_drive(self, drive: str) -> list[WatchEvent]:
+        """Analyse complete d'un lecteur amovible ; les evenements partent par on_event."""
+        try:
+            report = self.scanner.scan([Path(drive)], exclude=self.exclude)
+        except Exception as exc:  # cle retiree pendant l'analyse, moteur en erreur...
+            event = WatchEvent("erreur", Path(drive), f"cle USB {drive} : analyse impossible ({exc})")
+            self.on_event(event)
+            return [event]
+        events = []
+        for det in report.detections:
+            if det.suspect or not self.quarantine:
+                events.append(WatchEvent("suspect" if det.suspect else "menace", det.path,
+                                         f"cle USB {drive} : {det.threat}", det))
+                continue
+            try:
+                self.quarantine.isolate(det.path, det.threat, det.sha256)
+                events.append(WatchEvent("quarantaine", det.path, f"cle USB {drive} : menace "
+                                         f"bloquee ({det.threat}), mise en quarantaine", det))
+            except OSError as exc:
+                events.append(WatchEvent("menace", det.path, f"cle USB {drive} : {det.threat} "
+                                         f"(quarantaine impossible : {exc})", det))
+        self.scanned += report.scanned
+        verdict = (f"{len(report.threats)} menace(s)" if report.detections else "aucune menace")
+        events.append(WatchEvent("usb", Path(drive), f"cle USB {drive} analysee : "
+                                 f"{report.scanned} fichiers, {verdict}"))
+        for event in events:
+            self.on_event(event)
+        return events
+
+    def wait_drives(self, timeout: float | None = None) -> None:
+        """Attend la fin des analyses de cles USB en cours."""
+        for scan in list(self._drive_scans):
+            scan.join(timeout)
 
     def _scan(self, path: Path) -> WatchEvent | None:
         try:
@@ -144,6 +193,21 @@ class FolderWatcher:
                 except OSError:
                     pass
             self.poll()
+
+
+def removable_drives() -> set[str]:
+    """Lecteurs amovibles branches (cles USB, cartes SD), par exemple {"E:\\"}. Windows."""
+    if os.name != "nt":
+        return set()
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    mask, drives = kernel32.GetLogicalDrives(), set()
+    for i in range(26):
+        if mask & (1 << i):
+            root = f"{chr(65 + i)}:\\"
+            if kernel32.GetDriveTypeW(root) == 2:  # DRIVE_REMOVABLE
+                drives.add(root)
+    return drives
 
 
 def notify(title: str, message: str) -> None:

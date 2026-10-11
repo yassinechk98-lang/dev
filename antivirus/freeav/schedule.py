@@ -93,7 +93,24 @@ def install(system: System, program: list[str], at: str = "12:00",
     return done
 
 
-def remove(system: System) -> list[str]:
+def request_stop() -> None:
+    """Demande a la protection en temps reel deja lancee de s'arreter (sous 2 secondes)."""
+    STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
+    STOP_FILE.write_text(str(time.time()), encoding="utf-8")
+
+
+def wait_and(action, attempts: int = 10, delay: float = 0.5):
+    """Reessaie une action sur un fichier encore ouvert par la protection qui s'arrete."""
+    for attempt in range(attempts):
+        try:
+            return action()
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(delay)
+
+
+def remove(system: System, keep_copy: bool = False) -> list[str]:
     _check_windows(system)
     done = []
     if system.run(["schtasks", "/query", "/tn", SCAN_TASK]).returncode == 0:
@@ -104,23 +121,20 @@ def remove(system: System) -> list[str]:
     if system.registry.get("HKCU", RUN_KEY, RUN_VALUE):
         system.registry.delete("HKCU", RUN_KEY, RUN_VALUE)
         done.append("protection en temps reel retiree du demarrage")
-    STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STOP_FILE.write_text(str(time.time()), encoding="utf-8")  # arrete la surveillance en cours
+    request_stop()  # arrete la surveillance en cours
+    from .installer import is_installed
     copy = install_dir(system) / "FreeAV.exe"
-    if copy.exists():
-        for _ in range(10):  # la surveillance s'arrete en moins de 3 secondes
-            try:
-                copy.unlink()
-                done.append(f"copie de FreeAV supprimee ({copy})")
-                break
-            except PermissionError:
-                time.sleep(0.5)
-        else:
-            done.append(f"copie de FreeAV encore utilisee, a supprimer a la main : {copy}")
+    if keep_copy or is_installed(system) or not copy.exists():
+        return done  # FreeAV installe : sa copie reste, c'est le programme lui-meme
+    try:
+        wait_and(copy.unlink)
+        done.append(f"copie de FreeAV supprimee ({copy})")
         try:
             copy.parent.rmdir()
         except OSError:
             pass
+    except PermissionError:
+        done.append(f"copie de FreeAV encore utilisee, a supprimer a la main : {copy}")
     return done
 
 

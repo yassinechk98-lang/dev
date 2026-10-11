@@ -34,6 +34,11 @@ class FakeRegistry:
             raise RegistryError("droits administrateur necessaires")
         self.data.get((hive, key), {}).pop(name, None)
 
+    def delete_key(self, hive, key):
+        for h, k in list(self.data):
+            if h == hive and (k.lower() == key.lower() or k.lower().startswith(key.lower() + "\\")):
+                del self.data[(h, k)]
+
 
 class FakeRunner:
     def __init__(self, outputs=None):
