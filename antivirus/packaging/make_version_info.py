@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Yassine
+
 """Ecrit la ressource de version Windows de FreeAV.exe (format VSVersionInfo de PyInstaller),
 pour que les proprietes du fichier et les antivirus voient quel produit c'est.
 
@@ -12,7 +15,7 @@ from freeav import __version__  # noqa: E402
 
 COMPANY = "FreeAV (projet open source)"
 DESCRIPTION = "FreeAV - antivirus gratuit"
-COPYRIGHT = "Copyright (c) 2026 Yassine - licence GNU GPL v3 (GPL-3.0-only)"
+COPYRIGHT = "Copyright (C) 2026 Yassine - Licence GPL-3.0-or-later"
 
 TEMPLATE = """# Genere par packaging/make_version_info.py
 VSVersionInfo(

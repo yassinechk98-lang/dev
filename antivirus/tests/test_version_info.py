@@ -15,7 +15,7 @@ def test_version_resource_names_the_product():
     text = make_version_info.render(18, "0.1.0")
     assert "filevers=(0, 1, 0, 18)" in text and "prodvers=(0, 1, 0, 18)" in text
     for value in ("'FreeAV (projet open source)'", "'FreeAV - antivirus gratuit'", "'0.1.0.18'",
-                  "'FreeAV.exe'", "'Copyright (c) 2026 Yassine - licence GNU GPL v3 (GPL-3.0-only)'"):
+                  "'FreeAV.exe'", "'Copyright (C) 2026 Yassine - Licence GPL-3.0-or-later'"):
         assert value in text
 
 

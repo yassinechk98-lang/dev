@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Yassine
+
 """Genere l'icone de FreeAV (bouclier vert avec une coche) en .ico multi-tailles."""
 
 import sys

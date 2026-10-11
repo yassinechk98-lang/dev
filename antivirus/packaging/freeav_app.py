@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Yassine
+
 """Point d'entree de FreeAV.exe : ouvre l'interface graphique, ou la ligne de commande
 si des arguments sont donnes (par exemple : FreeAV.exe scan C:\\Users\\moi\\Downloads)."""
 

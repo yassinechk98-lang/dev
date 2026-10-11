@@ -149,10 +149,19 @@ gratuit ou payant, ne detecte toutes les menaces : FreeAV complete les bonnes pr
 
 ## Licence
 
-FreeAV est un logiciel libre, sous licence **GNU GPL version 3** (GPL-3.0-only) : texte complet dans
-[LICENSE](LICENSE). Vous pouvez l'utiliser, l'etudier, le modifier et le redistribuer ; une version
-modifiee que vous distribuez doit rester sous la meme licence, avec son code source.
-Cette licence couvre le dossier `antivirus/` uniquement, pas les autres projets du depot.
+Copyright (C) 2026 Yassine.
+
+FreeAV est un logiciel libre : vous pouvez le redistribuer et/ou le modifier selon les termes de la
+GNU General Public License telle que publiee par la Free Software Foundation, soit la version 3 de
+la licence, soit (a votre choix) toute version ulterieure (GPL-3.0-or-later).
+
+FreeAV est distribue dans l'espoir qu'il sera utile, mais SANS AUCUNE GARANTIE ; sans meme la
+garantie implicite de QUALITE MARCHANDE ou d'ADEQUATION A UN USAGE PARTICULIER. Voir la GNU General
+Public License pour plus de details : texte complet dans [LICENSE](LICENSE).
+
+Cette licence couvre le dossier `antivirus/` et les scripts qui construisent et testent FreeAV
+(`.github/workflows/build-windows.yml` et `.github/workflows/antivirus-tests.yml`). Elle ne couvre
+pas les autres projets du depot.
 
 ClamAV, que FreeAV peut installer a votre demande, est un programme separe de Cisco Talos sous sa
 propre licence (GPLv2) : https://github.com/Cisco-Talos/clamav
