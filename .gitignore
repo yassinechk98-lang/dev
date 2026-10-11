@@ -24,3 +24,4 @@ chat-app/
 antivirus/freeav/data/freeav.ico
 *.spec
 antivirus/freeav/data/clamav.json
+antivirus/freeav/data/build.json

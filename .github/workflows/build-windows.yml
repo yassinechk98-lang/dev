@@ -6,7 +6,7 @@ name: FreeAV pour Windows
 # Un lancement manuel avec canal=test publie la branche choisie au lien public.
 on:
   push:
-    branches: [main, antivirus-prototype, freeav-app]
+    branches: [main, antivirus-prototype, freeav-app, freeav-maj]
     paths: ["antivirus/**", ".github/workflows/build-windows.yml"]
   workflow_dispatch:
     inputs:
@@ -82,6 +82,13 @@ jobs:
       - name: Cree l'icone
         run: python packaging/make_icon.py freeav/data/freeav.ico
 
+      - name: Inscrit le numero de version
+        shell: pwsh
+        run: |
+          @{ build = [int]$env:GITHUB_RUN_NUMBER; canal = $env:CANAL; commit = $env:GITHUB_SHA } |
+            ConvertTo-Json | Set-Content -Encoding utf8NoBOM freeav/data/build.json
+          Get-Content freeav/data/build.json
+
       - name: Construit FreeAV.exe
         run: >
           pyinstaller --noconfirm --onefile --windowed --name FreeAV
@@ -143,6 +150,24 @@ jobs:
           if ($menu -notlike "*FreeAV.exe*gui --scan*%1*") { Echec "clic droit incorrect : $menu" }
           $raccourci = Join-Path ([Environment]::GetFolderPath('Programs')) "FreeAV.lnk"
           if (-not (Test-Path $raccourci)) { Echec "raccourci du menu Demarrer absent" }
+          # Mise a jour de FreeAV : la copie installee se remplace et relance la protection
+          if ((Lance @("schedule", "--at", "03:00")) -ne 0) { Echec "installation de la protection automatique" }
+          $nouveau = (Get-FileHash dist/FreeAV.exe -Algorithm SHA256).Hash.ToLower()
+          $p = Start-Process $installe -PassThru -ArgumentList "app-update", "--from-file", (Resolve-Path dist/FreeAV.exe), "--sha256", $nouveau, "--build", "999999" `
+            -RedirectStandardOutput sortie.txt -RedirectStandardError erreurs.txt
+          $p.WaitForExit()
+          Get-Content sortie.txt, erreurs.txt | Write-Host
+          if ($p.ExitCode -ne 0) { Echec "mise a jour de FreeAV, code $($p.ExitCode)" }
+          if ((Get-FileHash $installe -Algorithm SHA256).Hash.ToLower() -ne $nouveau) { Echec "FreeAV.exe installe non remplace" }
+          if ((Get-Content sortie.txt -Raw) -like "*prochaine ouverture de session*") {
+            # Le serveur de la CI est administrateur : FreeAV ne relance pas la protection avec ces droits
+            Write-Host "protection : relance laissee a la prochaine session (administrateur)"
+          } else {
+            Start-Sleep -Seconds 8
+            $veille = Get-CimInstance Win32_Process -Filter "Name='FreeAV.exe'" | Where-Object { $_.CommandLine -like "*watch --quarantine*" }
+            if (-not $veille) { Echec "protection en temps reel non relancee apres la mise a jour" }
+          }
+          if ((Lance @("schedule", "--remove")) -ne 0) { Echec "retrait de la protection automatique" }
           # Desinstallation par la copie installee (comme depuis Parametres > Applications) :
           # FreeAV.exe doit s'effacer lui-meme juste apres
           $p = Start-Process $installe -ArgumentList "uninstall", "--yes" -Wait -PassThru `
@@ -162,6 +187,12 @@ jobs:
           $global:LASTEXITCODE = 0
           (Get-FileHash dist/FreeAV.exe -Algorithm SHA256).Hash.ToLower() + "  FreeAV.exe" | Set-Content dist/FreeAV.exe.sha256
           Copy-Item $env:FREEAV_CLAMAV_ZIP dist/FreeAV-ClamAV.zip
+          # Fichier de version lu par FreeAV pour proposer ses mises a jour
+          @{ build = [int]$env:GITHUB_RUN_NUMBER; commit = $env:GITHUB_SHA
+             sha256 = (Get-FileHash dist/FreeAV.exe -Algorithm SHA256).Hash.ToLower()
+             size = (Get-Item dist/FreeAV.exe).Length
+             url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:CANAL/FreeAV.exe" } |
+            ConvertTo-Json | Set-Content -Encoding utf8NoBOM dist/FreeAV.json
 
       - uses: actions/upload-artifact@v4
         with:
@@ -170,6 +201,7 @@ jobs:
             antivirus/dist/FreeAV.exe
             antivirus/dist/FreeAV.exe.sha256
             antivirus/dist/FreeAV-ClamAV.zip
+            antivirus/dist/FreeAV.json
 
   publish:
     needs: build
@@ -204,6 +236,6 @@ jobs:
             echo
             echo "FreeAV-ClamAV.zip : moteur ClamAV ${CLAMAV_VERSION} officiel (Cisco Talos, GPLv2), telecharge par FreeAV quand vous cliquez sur « Installer ClamAV ». Code source de ClamAV : https://github.com/Cisco-Talos/clamav"
           } > notes.md
-          gh release create "$CANAL" FreeAV.exe FreeAV.exe.sha256 FreeAV-ClamAV.zip \
+          gh release create "$CANAL" FreeAV.exe FreeAV.exe.sha256 FreeAV-ClamAV.zip FreeAV.json \
             --prerelease --target "${{ github.sha }}" \
             --title "$TITLE" --notes-file notes.md

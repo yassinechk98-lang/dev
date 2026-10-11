@@ -1,6 +1,7 @@
 """Interface en ligne de commande : python -m freeav scan <chemin>..."""
 
 import argparse
+import shutil
 import sys
 from pathlib import Path
 
@@ -350,12 +351,64 @@ def cmd_auto(args) -> int:
         lines.append(f"  {f.title} : {f.detail}")
         alerts.append(f"{f.title} (ouvrez FreeAV > Reparer mon PC)")
 
+    newer = None
+    try:
+        from . import selfupdate
+        newer = selfupdate.check() if selfupdate.auto_check_enabled() else None
+        if newer:
+            lines.append(f"nouvelle version de FreeAV disponible (version {newer.build})")
+    except Exception as exc:  # pas de reseau : ce n'est pas un probleme du PC
+        lines.append(f"verification de version impossible : {exc}")
+
     _log(lines)
     print("\n".join(lines))
+    if newer and args.notify and not alerts:
+        watcher.notify("FreeAV - nouvelle version", "Une nouvelle version de FreeAV est "
+                       "disponible.\n\nOuvrez FreeAV et cliquez sur « Mettre a jour FreeAV ».")
     if alerts and args.notify:
         watcher.notify("FreeAV - analyse automatique", "FreeAV a trouve des problemes :\n\n"
                        + "\n".join(alerts[:8]) + f"\n\nJournal : {LOG_FILE}")
     return 1 if alerts else 0
+
+
+def cmd_app_update(args) -> int:
+    from . import selfupdate
+    from .repair.platform import System
+    if args.auto_check:
+        selfupdate.set_auto_check(args.auto_check == "on")
+        print("Verification automatique des nouvelles versions : "
+              + ("activee." if args.auto_check == "on" else "desactivee (FreeAV ne contacte plus "
+                 "GitHub tout seul ; app-update reste possible a la main)."))
+        return 0
+    try:
+        if args.from_file:  # essai de la CI : meme chemin qu'une vraie mise a jour, sans reseau
+            if not args.sha256:
+                raise selfupdate.SelfUpdateError("--sha256 obligatoire avec --from-file")
+            source = Path(args.from_file)
+            release = selfupdate.Release(args.build, args.sha256, source.stat().st_size,
+                                         source.as_uri())
+            fetcher = lambda url, limit, dest: shutil.copyfile(source, dest)
+        else:
+            fetcher = None
+            if not selfupdate.current_build():
+                print("Cette copie de FreeAV ne se met pas a jour toute seule (code source : git pull).")
+                return 0
+            release = selfupdate.check()
+            if not release:
+                print("FreeAV est a jour.")
+                return 0
+            print(f"Nouvelle version disponible : version {release.build}")
+            if args.check:
+                return 0
+            if not args.yes and input("Installer maintenant ? [o/N] ").strip().lower() not in ("o", "oui"):
+                print("Rien n'a ete modifie.")
+                return 0
+        for step in selfupdate.apply(release, System(), progress=print, fetcher=fetcher):
+            print(f"  - {step}")
+    except (selfupdate.SelfUpdateError, OSError) as exc:
+        print(f"Erreur : {exc}", file=sys.stderr)
+        return 2
+    return 0
 
 
 def cmd_clamav(args) -> int:
@@ -533,6 +586,15 @@ def main(argv: list[str] | None = None) -> int:
     auto.add_argument("--notify", action="store_true", help="afficher une alerte Windows")
     auto.set_defaults(func=cmd_auto)
 
+    appup = sub.add_parser("app-update", help="installer la derniere version de FreeAV (Windows)")
+    appup.add_argument("--check", action="store_true", help="seulement verifier")
+    appup.add_argument("--yes", action="store_true", help="installer sans demander")
+    appup.add_argument("--auto-check", choices=["on", "off"],
+                       help="verification automatique (ouverture de FreeAV, entretien quotidien)")
+    appup.add_argument("--from-file", help=argparse.SUPPRESS)
+    appup.add_argument("--sha256", help=argparse.SUPPRESS)
+    appup.add_argument("--build", type=int, default=0, help=argparse.SUPPRESS)
+    appup.set_defaults(func=cmd_app_update)
     clam = sub.add_parser("clamav", help="moteur ClamAV integre (Windows)")
     clam_group = clam.add_mutually_exclusive_group()
     clam_group.add_argument("--install", action="store_true", help="installer ClamAV et ses signatures")

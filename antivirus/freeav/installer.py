@@ -82,9 +82,14 @@ def self_delete_command(exe: Path) -> str:
             f"-EncodedCommand {encoded}")
 
 
-def _spawn_self_delete(system: System, exe: Path) -> None:
+def launch_with_wmi(system: System, command_line: str) -> None:
+    """Lance command_line hors du job de FreeAV.exe (voir plus haut)."""
     # _powershell passe la valeur par la variable FREEAV_EXE (ici la ligne de commande a lancer)
-    _powershell(system, LAUNCH_SCRIPT, self_delete_command(exe))
+    _powershell(system, LAUNCH_SCRIPT, command_line)
+
+
+def _spawn_self_delete(system: System, exe: Path) -> None:
+    launch_with_wmi(system, self_delete_command(exe))
 
 
 class InstallError(Exception):

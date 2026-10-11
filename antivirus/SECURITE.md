@@ -11,6 +11,11 @@
   l'interface), ou chaque jour si vous avez active la protection automatique et enregistre une cle
   abuse.ch. Elle telecharge des empreintes publiques et n'envoie rien sur vous. La protection en
   temps reel n'utilise pas le reseau.
+- **Verification des nouvelles versions de FreeAV** : a chaque ouverture de FreeAV et dans
+  l'entretien quotidien, FreeAV lit un petit fichier public sur github.com. Rien n'est envoye sur
+  vous, mais GitHub voit, comme pour toute page web, votre adresse IP et l'heure. Vous pouvez la
+  couper (case « Chercher les nouvelles versions » ou `FreeAV.exe app-update --auto-check off`) ;
+  la mise a jour reste alors possible a la main.
 - **La protection automatique reste chez vous et se retire en un clic** : une tache planifiee
   "FreeAV\\Analyse quotidienne" et une entree "FreeAV" au demarrage de votre session, sans droits
   administrateur, avec une copie de FreeAV dans `%LOCALAPPDATA%\FreeAV`. Le journal
@@ -66,6 +71,15 @@
   correspond pas a celle inscrite dans FreeAV.exe, et son archive ne peut rien ecrire hors de son
   dossier. Microsoft Defender est lance avec `-DisableRemediation` et suit ses propres reglages de
   confidentialite, deja actifs sur le PC.
+- **Mises a jour de FreeAV lui-meme** : seulement si vous les acceptez. FreeAV lit `FreeAV.json` dans
+  la pre-release GitHub de sa version (HTTPS, github.com et ses serveurs de fichiers uniquement,
+  redirections comprises), n'accepte qu'une version plus recente, pour son propre canal, et refuse le
+  fichier si son empreinte SHA-256 ou sa taille ne correspondent pas, ou si ce n'est pas un programme
+  Windows. L'ancienne version est remise en place si le remplacement echoue. En administrateur,
+  la protection en temps reel n'est pas relancee (elle tournerait avec ces droits sur des dossiers
+  modifiables sans droits) : la nouvelle version prend le relais a la prochaine session. Limite : l'empreinte vient
+  de la meme page GitHub que le programme ; FreeAV fait donc confiance au compte GitHub du projet,
+  comme pour le telechargement direct (FreeAV.exe n'est pas signe).
 - **Outils de construction figes** (`requirements-build.txt`) pour FreeAV.exe.
 - **Dependabot** propose les mises a jour de securite des dependances et des actions GitHub.
 - Les workflows n'ont que les droits en lecture dont ils ont besoin.

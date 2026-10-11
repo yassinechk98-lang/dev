@@ -71,13 +71,27 @@ def load_auth_key(config_file: Path = CONFIG_FILE) -> str:
 
 def save_auth_key(key: str, config_file: Path = CONFIG_FILE) -> None:
     """Enregistre la cle dans ~/.freeav/config.json, lisible par le seul utilisateur."""
+    save_setting("abusech_auth_key", check_auth_key(key), config_file)
+
+
+def load_setting(name: str, default=None, config_file: Path = CONFIG_FILE):
+    try:
+        return json.loads(Path(config_file).read_text(encoding="utf-8")).get(name, default)
+    except (OSError, ValueError, AttributeError):
+        return default
+
+
+def save_setting(name: str, value, config_file: Path = CONFIG_FILE) -> None:
+    """Enregistre un reglage dans ~/.freeav/config.json, lisible par le seul utilisateur."""
     config_file = Path(config_file)
     ensure_private_dir(config_file.parent)
     try:
         config = json.loads(config_file.read_text(encoding="utf-8"))
+        if not isinstance(config, dict):
+            config = {}
     except (OSError, ValueError):
         config = {}
-    config["abusech_auth_key"] = check_auth_key(key)
+    config[name] = value
     fd, tmp = tempfile.mkstemp(dir=config_file.parent, prefix=".config-")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(config, fh)
