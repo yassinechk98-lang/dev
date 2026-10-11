@@ -56,6 +56,7 @@ function RegisterPage({ setToken, mode, basculerMode }) {
         <TextField
           label="Mot de passe"
           type="password"
+          helperText="12 caracteres minimum"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           fullWidth

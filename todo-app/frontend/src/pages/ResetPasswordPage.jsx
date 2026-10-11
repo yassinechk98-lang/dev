@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { Typography, TextField, Button, Alert, Link, Stack } from '@mui/material';
 import LockResetIcon from '@mui/icons-material/LockReset';
@@ -7,12 +7,17 @@ import AuthLayout from '../AuthLayout';
 
 function ResetPasswordPage({ mode, basculerMode }) {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  // Le jeton est lu une seule fois puis retire de la barre d'adresse (securite.md JWT-7)
+  const [token] = useState(() => searchParams.get("token"));
   const [password, setPassword] = useState("");
   const [erreur, setErreur] = useState(null);
   const [succes, setSucces] = useState(false);
   const [chargement, setChargement] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (searchParams.has("token")) navigate("/reset-password", { replace: true });
+  }, [searchParams, navigate]);
 
   const valider = () => {
     setErreur(null);
@@ -53,6 +58,7 @@ function ResetPasswordPage({ mode, basculerMode }) {
           <TextField
             label="Nouveau mot de passe"
             type="password"
+            helperText="12 caracteres minimum"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             fullWidth

@@ -1,5 +1,17 @@
 const BASE_URL = "https://dev-tpob.onrender.com";
 
+// Un jeton expire ou revoque (mot de passe reinitialise) renvoie 401 :
+// on deconnecte proprement au lieu d'afficher une erreur serveur.
+function avecSession(promesse) {
+  return promesse.then((reponse) => {
+    if (reponse.status === 401) {
+      localStorage.removeItem("token");
+      window.location.assign("/login");
+    }
+    return reponse;
+  });
+}
+
 export function login(username, password) {
   return fetch(`${BASE_URL}/login`, {
     method: "POST",
@@ -33,13 +45,13 @@ export function reinitialiserMotDePasse(token, password) {
 }
 
 export function getTaches(token) {
-  return fetch(`${BASE_URL}/taches`, {
+  return avecSession(fetch(`${BASE_URL}/taches`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function creerTache(token, titre, dateEcheance, recurrence, priorite, tags) {
-  return fetch(`${BASE_URL}/taches`, {
+  return avecSession(fetch(`${BASE_URL}/taches`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -52,21 +64,21 @@ export function creerTache(token, titre, dateEcheance, recurrence, priorite, tag
       priorite: priorite || null,
       tags: tags || [],
     }),
-  });
+  }));
 }
 
 export function basculerTache(token, id) {
-  return fetch(`${BASE_URL}/taches/${id}`, {
+  return avecSession(fetch(`${BASE_URL}/taches/${id}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function supprimerTache(token, id) {
-  return fetch(`${BASE_URL}/taches/${id}`, {
+  return avecSession(fetch(`${BASE_URL}/taches/${id}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function getVapidPublicKey() {
@@ -74,130 +86,130 @@ export function getVapidPublicKey() {
 }
 
 export function pushSubscribe(token, subscription) {
-  return fetch(`${BASE_URL}/push-subscribe`, {
+  return avecSession(fetch(`${BASE_URL}/push-subscribe`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(subscription),
-  });
+  }));
 }
 
 export function pushUnsubscribe(token, endpoint) {
-  return fetch(`${BASE_URL}/push-unsubscribe`, {
+  return avecSession(fetch(`${BASE_URL}/push-unsubscribe`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ endpoint }),
-  });
+  }));
 }
 
 export function getSousTaches(token, tacheId) {
-  return fetch(`${BASE_URL}/taches/${tacheId}/sous-taches`, {
+  return avecSession(fetch(`${BASE_URL}/taches/${tacheId}/sous-taches`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function creerSousTache(token, tacheId, titre) {
-  return fetch(`${BASE_URL}/taches/${tacheId}/sous-taches`, {
+  return avecSession(fetch(`${BASE_URL}/taches/${tacheId}/sous-taches`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ titre }),
-  });
+  }));
 }
 
 export function basculerSousTache(token, id) {
-  return fetch(`${BASE_URL}/sous-taches/${id}`, {
+  return avecSession(fetch(`${BASE_URL}/sous-taches/${id}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function supprimerSousTache(token, id) {
-  return fetch(`${BASE_URL}/sous-taches/${id}`, {
+  return avecSession(fetch(`${BASE_URL}/sous-taches/${id}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function getAdminTables(token) {
-  return fetch(`${BASE_URL}/admin/tables`, {
+  return avecSession(fetch(`${BASE_URL}/admin/tables`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function getAdminLignes(token, nomTable) {
-  return fetch(`${BASE_URL}/admin/tables/${nomTable}`, {
+  return avecSession(fetch(`${BASE_URL}/admin/tables/${nomTable}`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function creerPartage(token, username) {
-  return fetch(`${BASE_URL}/partages`, {
+  return avecSession(fetch(`${BASE_URL}/partages`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ username }),
-  });
+  }));
 }
 
 export function getPartages(token) {
-  return fetch(`${BASE_URL}/partages`, {
+  return avecSession(fetch(`${BASE_URL}/partages`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function supprimerPartage(token, id) {
-  return fetch(`${BASE_URL}/partages/${id}`, {
+  return avecSession(fetch(`${BASE_URL}/partages/${id}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function getTachesPartagees(token, proprietaireId) {
-  return fetch(`${BASE_URL}/taches/partages/${proprietaireId}`, {
+  return avecSession(fetch(`${BASE_URL}/taches/partages/${proprietaireId}`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function exporterTaches(token) {
-  return fetch(`${BASE_URL}/export`, {
+  return avecSession(fetch(`${BASE_URL}/export`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function importerTaches(token, items) {
-  return fetch(`${BASE_URL}/import`, {
+  return avecSession(fetch(`${BASE_URL}/import`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(items),
-  });
+  }));
 }
 
 export function getStats(token) {
-  return fetch(`${BASE_URL}/stats`, {
+  return avecSession(fetch(`${BASE_URL}/stats`, {
     headers: { Authorization: `Bearer ${token}` },
-  });
+  }));
 }
 
 export function envoyerMessageAssistant(token, message, historique) {
-  return fetch(`${BASE_URL}/assistant`, {
+  return avecSession(fetch(`${BASE_URL}/assistant`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ message, historique }),
-  });
+  }));
 }

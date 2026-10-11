@@ -64,8 +64,9 @@ Hors périmètre : `antivirus/` (application de bureau, ses règles sont dans
   `model_config = ConfigDict(extra="forbid")`) **avant** toute logique. INTERDIT :
   `data["champ"]` sur le dict brut.
 - **VAL-2** Le schéma fixe le type, la longueur et le format de chaque champ :
-  - `username` : 3 à 32 caractères, `^[A-Za-z0-9_.-]+$`
-  - `email` : format email valide (`EmailStr`), 254 caractères maximum, normalisé en minuscules
+  - `username` à l'inscription : 3 à 32 caractères, `^[A-Za-z0-9_.-]+$` (connexion et partage
+    acceptent les noms existants, 128 caractères maximum)
+  - `email` : format `nom@domaine.ext`, 254 caractères maximum, comparé sans tenir compte de la casse
   - `password` : 12 à 128 caractères
   - `titre` (tâche, sous-tâche) : 1 à 200 caractères après `strip()`
   - `tags` : 10 au maximum, 1 à 30 caractères chacun
@@ -76,7 +77,8 @@ Hors périmètre : `antivirus/` (application de bureau, ses règles sont dans
   invalide ne doit jamais provoquer une erreur 500.
 - **VAL-4** Taille maximale des requêtes : `app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024`.
 - **VAL-5** Toute liste reçue a une taille maximale : import 500 tâches et 50 sous-tâches par
-  tâche, historique de l'assistant 20 messages et 20 Ko.
+  tâche ; l'historique de l'assistant est ramené par le serveur à 30 messages et 64 Ko (les plus
+  anciens sont retirés).
 - **VAL-6** Les arguments des appels de fonction renvoyés par Gemini passent par **le même
   schéma** que les entrées HTTP équivalentes.
 - **VAL-7 INTERDIT** : que le serveur appelle une URL fournie par un utilisateur sans contrôle
@@ -99,10 +101,13 @@ Hors périmètre : `antivirus/` (application de bureau, ses règles sont dans
   l'email existe ou non (envoi de l'email hors de la requête).
 - **AUTH-5 OBLIGATOIRE** : limiter le débit (Flask-Limiter) sur :
   - `/login` : 10 par minute par IP et 5 par minute par nom d'utilisateur
-  - `/register` : 5 par heure par IP
+  - `/register` : 10 par heure par IP
   - `/forgot-password` : 3 par heure par IP et par email
   - `/reset-password` : 10 par heure par IP
   - `/assistant` : 20 par minute par utilisateur
+
+  Les compteurs sont dans la table `limites_debit` (clés hachées, nettoyées par
+  `/check-reminders`). L'IP du client est la première de `X-Forwarded-For`, posée par Render.
 - **AUTH-6** Le rôle administrateur est stocké en base (colonne `role` ou `is_admin`).
   INTERDIT : déduire un droit d'un nom d'utilisateur, qu'un inscrit pourrait revendiquer.
 - **AUTH-7** Toute route porte `@token_requis` ou `@admin_requis`, sauf ces routes publiques :
@@ -117,6 +122,10 @@ Hors périmètre : `antivirus/` (application de bureau, ses règles sont dans
 - **JWT-1** Décoder toujours avec `algorithms=["HS256"]` explicite et
   `options={"require": ["exp", "iat", "type"]}`. INTERDIT : `algorithms` absent, `"none"`,
   `verify_signature=False`.
+  Exception temporaire : les jetons de session émis avant l'ajout de `type` et `ver` (sans ces
+  claims, 7 jours de validité) restent acceptés jusqu'au 1er décembre 2026
+  (`FIN_JETONS_ANCIENS` dans `app.py`), pour ne déconnecter personne au déploiement. Supprimer
+  ce chemin après cette date.
 - **JWT-2** `SECRET_KEY` : au moins 32 octets aléatoires
   (`python -c "import secrets; print(secrets.token_urlsafe(64))"`), uniquement dans les
   variables d'environnement (Render, secrets GitHub), différente entre production et tests.
@@ -124,8 +133,9 @@ Hors périmètre : `antivirus/` (application de bureau, ses règles sont dans
 - **JWT-3 OBLIGATOIRE** : chaque token porte un claim `type` (`"access"`, `"reset"`) et chaque
   décodeur **vérifie le type attendu**. Un token de réinitialisation ne doit jamais ouvrir
   une session, et inversement.
-- **JWT-4** Durées maximales : token de session 24 heures ; token de réinitialisation
-  30 minutes. Pour des sessions plus longues, un refresh token rotatif stocké haché en base.
+- **JWT-4** Durées maximales : token de réinitialisation 30 minutes ; token de session 7 jours,
+  uniquement parce que la révocation JWT-5 est en place (24 heures sans elle). Pour des sessions
+  plus longues, un refresh token rotatif stocké haché en base.
 - **JWT-5** Révocation : une colonne `token_version` dans `users`, copiée dans le JWT et
   vérifiée par `token_requis`. Elle est incrémentée à chaque changement ou réinitialisation
   du mot de passe, ce qui invalide les anciennes sessions **et rend le lien de
@@ -145,15 +155,15 @@ Hors périmètre : `antivirus/` (application de bureau, ses règles sont dans
   CORS(app, origins=[FRONTEND_URL], methods=["GET", "POST", "PUT", "DELETE"],
        allow_headers=["Content-Type", "Authorization"], supports_credentials=False, max_age=600)
   ```
-  `http://localhost:5173` n'est ajouté que si une variable d'environnement de développement le
-  demande.
+  `https://yassine-todo-app.netlify.app` est aussi autorisé. `http://localhost:5173` n'est
+  ajouté qu'en local, via `CORS_ORIGINES_SUPPLEMENTAIRES` dans `.env`.
 - **CORS-2** Les routes appelées par des machines (`/check-reminders`, futurs webhooks) n'ont
   pas besoin de CORS.
 - **HDR-1 OBLIGATOIRE** sur les deux sites Netlify, via un fichier `_headers` dans le dossier
   publié (`todo-app/frontend/public/_headers`, `site/_headers`) :
   ```
   /*
-    Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://dev-tpob.onrender.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+    Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://dev-tpob.onrender.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
     Strict-Transport-Security: max-age=31536000; includeSubDomains
     X-Content-Type-Options: nosniff
     X-Frame-Options: DENY
@@ -244,56 +254,64 @@ formulaire, la base, l'authentification ou un webhook :
 
 ## Annexe : écarts relevés dans le code le 11 octobre 2026
 
-Constat de l'analyse initiale. Cocher chaque ligne une fois corrigée.
+Constat de l'analyse initiale. Cocher chaque ligne une fois corrigée. Les lignes cochées ont
+été corrigées le 11 octobre 2026, avec un test par faille dans `todo-app/backend/test_securite.py`.
+Les corrections du frontend ne seront en ligne qu'au prochain déploiement Netlify de la todo-app.
 
 **Priorité haute**
 
-- [ ] **JWT-3** `token_requis` ne vérifie pas le claim `type` : le token du lien de
+- [x] **JWT-3** `token_requis` ne vérifie pas le claim `type` : le token du lien de
       réinitialisation (30 minutes) est accepté comme token de session par toute l'API.
       `todo-app/backend/app.py:145`
-- [ ] **VAL-7** L'`endpoint` d'un abonnement push n'est pas contrôlé : un utilisateur peut faire
+- [x] **VAL-7** L'`endpoint` d'un abonnement push n'est pas contrôlé : un utilisateur peut faire
       envoyer par le serveur des requêtes `POST` vers n'importe quelle URL (SSRF), à chaque
       rappel. `todo-app/backend/app.py:837-858` et `app.py:885`
-- [ ] **AUTH-5** Aucune limite de débit : essais de mots de passe illimités sur `/login`,
+- [x] **AUTH-5** Aucune limite de débit : essais de mots de passe illimités sur `/login`,
       envoi d'emails illimité via `/forgot-password`, appels Gemini illimités via `/assistant`.
-- [ ] **BD-9** Les tests backend tournent avec le secret `DATABASE_URL` et créent de vrais
+- [x] **BD-9** Les tests backend tournent avec le secret `DATABASE_URL` et créent de vrais
       comptes à chaque exécution. Si ce secret pointe vers la base de production (probable,
       à vérifier), les tests écrivent en production. `.github/workflows/backend-tests.yml:23-25`
-- [ ] **CORS-1** `CORS(app)` autorise toutes les origines. `todo-app/backend/app.py:21`
+- [x] **CORS-1** `CORS(app)` autorise toutes les origines. `todo-app/backend/app.py:21`
 
 **Priorité moyenne**
 
-- [ ] **AUTH-6** L'admin est reconnu par son nom (`ADMIN_USERNAME`) : si ce compte n'existe pas
+- [x] **AUTH-6** L'admin est reconnu par son nom (`ADMIN_USERNAME`) : si ce compte n'existe pas
       ou est supprimé, n'importe qui peut s'inscrire sous ce nom et devenir admin.
       `todo-app/backend/app.py:165`
-- [ ] **AUTH-3** Aucune politique de mot de passe (un seul caractère est accepté).
+- [x] **AUTH-3** Aucune politique de mot de passe (un seul caractère est accepté).
       `todo-app/backend/app.py:173`
-- [ ] **JWT-4, JWT-5** Sessions de 7 jours sans révocation : changer son mot de passe ou se
+- [x] **JWT-4, JWT-5** Sessions de 7 jours sans révocation : changer son mot de passe ou se
       déconnecter n'invalide pas les tokens existants, et le lien de réinitialisation reste
       réutilisable pendant 30 minutes. `todo-app/backend/app.py:104`, `app.py:231-236`
-- [ ] **VAL-1, VAL-3** Validation manuelle : un `titre` non textuel, des `keys` push absentes ou
+      Corrigé pour la réinitialisation ; la déconnexion reste locale au navigateur (le jeton
+      expire au bout de 7 jours).
+- [x] **VAL-1, VAL-3** Validation manuelle : un `titre` non textuel, des `keys` push absentes ou
       une date mal formée provoquent une erreur 500 ; aucune longueur maximale ; pas de format
       d'email vérifié. `todo-app/backend/app.py:173`, `app.py:350`, `app.py:366`, `app.py:855`
-- [ ] **VAL-4, VAL-5** Pas de `MAX_CONTENT_LENGTH` ; l'historique de l'assistant n'a pas de
+- [x] **VAL-4, VAL-5** Pas de `MAX_CONTENT_LENGTH` ; l'historique de l'assistant n'a pas de
       limite de taille. `todo-app/backend/app.py:786`
-- [ ] **SEC-3, SEC-5** Clé Gemini dans l'URL, et texte brut de l'erreur Gemini renvoyé au
+- [x] **SEC-3, SEC-5** Clé Gemini dans l'URL, et texte brut de l'erreur Gemini renvoyé au
       client. `todo-app/backend/app.py:799`, `app.py:808`
-- [ ] **WH-1** `CRON_SECRET` comparé avec `!=`. `todo-app/backend/app.py:906`
+- [x] **WH-1** `CRON_SECRET` comparé avec `!=`. `todo-app/backend/app.py:906`
 - [ ] **HDR-1, JWT-6** Aucun en-tête de sécurité sur les deux sites Netlify (pas de `_headers`
       ni de `netlify.toml`) alors que le token est dans `localStorage`.
       `todo-app/frontend/public/`, `todo-app/frontend/src/App.jsx:26`
-- [ ] **JWT-7** Le token de réinitialisation reste dans la barre d'adresse.
+      En cours : `todo-app/frontend/public/_headers` ajouté, avec la CSP en mode `Report-Only`
+      à passer en mode bloquant après vérification ; `site/_headers` reste à faire.
+- [x] **JWT-7** Le token de réinitialisation reste dans la barre d'adresse.
       `todo-app/frontend/src/pages/ResetPasswordPage.jsx:10`
 
 **Priorité basse**
 
-- [ ] **VAL-6** Les arguments de fonction renvoyés par Gemini ne sont pas validés avant
+- [x] **VAL-6** Les arguments de fonction renvoyés par Gemini ne sont pas validés avant
       d'écrire en base. `todo-app/backend/app.py:767`
+- [ ] **BD-11** `/taches`, `/export` et `/taches/partages/<id>` renvoient toutes les lignes sans
+      limite ni pagination (il faudra adapter le frontend). `todo-app/backend/app.py`
 - [ ] **SEC-8** Dependabot ne surveille que `/antivirus` ; `todo-app/backend` et
       `todo-app/frontend` ne sont pas couverts. `.github/dependabot.yml`
-- [ ] **AUTH-4** `/forgot-password` envoie l'email pendant la requête : le délai de réponse
+- [x] **AUTH-4** `/forgot-password` envoie l'email pendant la requête : le délai de réponse
       révèle si l'email est inscrit. `todo-app/backend/app.py:207-214`
-- [ ] **AUTH-8** `app.run(debug=True)` en dur (sans effet sur Render, qui lance gunicorn).
+- [x] **AUTH-8** `app.run(debug=True)` en dur (sans effet sur Render, qui lance gunicorn).
       `todo-app/backend/app.py:976`
 
 Points déjà conformes : requêtes SQL paramétrées partout, noms de tables admin issus d'une

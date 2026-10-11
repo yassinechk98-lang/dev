@@ -1,0 +1,11 @@
+# En-tetes de securite appliques par Netlify (securite.md HDR-1).
+# La CSP est d'abord en mode "Report-Only" : le navigateur signale les blocages dans la
+# console sans rien casser. Une fois verifie qu'aucun blocage n'apparait, remplacer
+# "Content-Security-Policy-Report-Only" par "Content-Security-Policy".
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://dev-tpob.onrender.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
