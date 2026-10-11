@@ -49,7 +49,9 @@ est optionnel (`pip install -r requirements-optional.txt`). Python 3.10 ou plus 
 - **Mises a jour de FreeAV** : au demarrage, FreeAV regarde si une version plus recente est publiee
   (et l'entretien quotidien previent). Le bouton **Mettre a jour FreeAV** (ou `FreeAV.exe app-update`)
   la telecharge depuis GitHub, verifie son empreinte SHA-256, remplace l'ancienne version, relance la
-  protection en temps reel et redemarre FreeAV. Rien ne change sans votre accord.
+  protection en temps reel et redemarre FreeAV. Rien ne change sans votre accord. La verification
+  contacte github.com ; elle se coupe avec la case « Chercher les nouvelles versions » ou
+  `FreeAV.exe app-update --auto-check off`.
 - **Ligne de commande** et **interface graphique** (Tkinter), avec un bandeau qui dit en un coup
   d'oeil si le PC est protege.
 

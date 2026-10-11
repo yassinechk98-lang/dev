@@ -10,7 +10,10 @@ recente, et ne remplace rien sans l'accord de l'utilisateur :
   - l'ancien FreeAV.exe est garde (FreeAV.old.exe) jusqu'au demarrage suivant, et remis en
     place si le remplacement echoue.
 
-Rien n'est envoye : FreeAV ne fait que telecharger deux fichiers publics.
+Rien n'est envoye : FreeAV ne fait que telecharger deux fichiers publics. La verification
+automatique (a l'ouverture de FreeAV et dans l'entretien quotidien) contacte github.com, qui
+voit donc l'adresse IP et l'heure ; elle se coupe avec `FreeAV.exe app-update --auto-check off`
+ou la case de l'interface.
 """
 
 import hashlib
@@ -65,6 +68,19 @@ def current_build() -> dict | None:
             and CANAL_RE.match(str(data.get("canal", "")))):
         return None
     return data
+
+
+AUTO_CHECK_SETTING = "check_app_updates"
+
+
+def auto_check_enabled() -> bool:
+    from . import updater
+    return updater.load_setting(AUTO_CHECK_SETTING, True, updater.CONFIG_FILE) is not False
+
+
+def set_auto_check(enabled: bool) -> None:
+    from . import updater
+    updater.save_setting(AUTO_CHECK_SETTING, bool(enabled), updater.CONFIG_FILE)
 
 
 def manifest_url(canal: str) -> str:
@@ -259,8 +275,16 @@ def apply(release: Release, system, progress: Callable[[str], None] = lambda m: 
     if installer.is_installed(system):
         system.registry.set("HKCU", installer.UNINSTALL_KEY, "DisplayVersion",
                             f"{__version__} (build {release.build})", installer.REG_SZ)
+    from . import quarantine
     run_entry = system.registry.get("HKCU", schedule.RUN_KEY, schedule.RUN_VALUE)
-    if run_entry and str(target).lower() in str(run_entry[0]).lower():
+    if not (run_entry and str(target).lower() in str(run_entry[0]).lower()):
+        return done
+    if quarantine._is_elevated():
+        # Relancee d'ici, la protection tournerait en administrateur sur des dossiers
+        # modifiables sans droits : elle repartira normalement a la prochaine session.
+        done.append("protection en temps reel : nouvelle version a la prochaine ouverture de "
+                    "session (FreeAV est lance en administrateur)")
+    else:
         schedule.request_stop()  # l'ancienne protection s'arrete...
         launcher([str(target)] + schedule.WATCH_ARGS)  # ...la nouvelle prend le relais
         done.append("protection en temps reel relancee avec la nouvelle version")

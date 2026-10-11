@@ -57,12 +57,15 @@ class App(tk.Tk):
         self.realtime = tk.BooleanVar(value=False)
         self.watch_stop: threading.Event | None = None
 
+        from . import selfupdate
+        self.auto_check = tk.BooleanVar(value=selfupdate.auto_check_enabled())
         self._build()
         self._refresh_engines()
         self._refresh_header()
         self.after(100, self._poll)
         self.app_update = None
-        threading.Thread(target=self._check_app_update, daemon=True).start()
+        if self.auto_check.get():
+            threading.Thread(target=self._check_app_update, daemon=True).start()
         if scan:  # "Analyser avec FreeAV" depuis le clic droit de l'Explorateur
             self.after(400, self._start_scan)
 
@@ -119,6 +122,8 @@ class App(tk.Tk):
                         variable=self.realtime, command=self._toggle_realtime).pack(side="left")
         ttk.Button(shield, text="Protection automatique...",
                    command=lambda: ScheduleWindow(self)).pack(side="right")
+        ttk.Checkbutton(shield, text="Chercher les nouvelles versions", variable=self.auto_check,
+                        command=self._toggle_auto_check).pack(side="right", padx=10)
 
         self.progress = ttk.Progressbar(self, mode="indeterminate")
         self.progress.pack(fill="x", padx=10, pady=8)
@@ -228,6 +233,15 @@ class App(tk.Tk):
             self.events.put(("clamav_done", msg))
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _toggle_auto_check(self):
+        from . import selfupdate
+        try:
+            selfupdate.set_auto_check(self.auto_check.get())
+        except OSError as exc:
+            messagebox.showerror("FreeAV", f"Reglage non enregistre : {exc}", parent=self)
+        if self.auto_check.get() and not self.app_update:
+            threading.Thread(target=self._check_app_update, daemon=True).start()
 
     def _check_app_update(self):
         from . import selfupdate

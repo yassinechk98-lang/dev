@@ -129,3 +129,33 @@ def test_running_program_can_be_replaced_on_windows(tmp_path):
     finally:
         proc.kill()
         proc.wait()
+
+
+def test_as_administrator_protection_is_not_restarted(tmp_path, monkeypatch):
+    system, _ = windows_system(tmp_path)
+    source = tmp_path / "FreeAV.exe"
+    source.write_bytes(b"MZ ancienne version")
+    installer.install(system, source)
+    exe = installer.target_exe(system)
+    system.registry.set("HKCU", schedule.RUN_KEY, schedule.RUN_VALUE,
+                        subprocess.list2cmdline([str(exe)] + schedule.WATCH_ARGS), 1)
+    monkeypatch.setattr("freeav.quarantine._is_elevated", lambda: True)
+    launched = []
+    release = selfupdate.parse_manifest(manifest(), "freeav-test")
+    done = selfupdate.apply(release, system, fetcher=lambda url, limit, dest: dest.write_bytes(NEW),
+                            launcher=launched.append, running=source)
+    assert exe.read_bytes() == NEW and launched == []
+    assert "prochaine ouverture de session" in done[-1]
+
+
+def test_automatic_version_check_can_be_turned_off(tmp_path, monkeypatch):
+    from freeav import cli, updater
+    monkeypatch.setattr(updater, "CONFIG_FILE", tmp_path / "config.json")
+    assert selfupdate.auto_check_enabled()
+    assert cli.main(["app-update", "--auto-check", "off"]) == 0
+    assert not selfupdate.auto_check_enabled()
+    updater.save_auth_key("cle-de-test-123", tmp_path / "config.json")  # autres reglages gardes
+    assert not selfupdate.auto_check_enabled()
+    assert updater.load_auth_key(tmp_path / "config.json") == "cle-de-test-123"
+    selfupdate.set_auto_check(True)
+    assert selfupdate.auto_check_enabled()

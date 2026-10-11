@@ -354,7 +354,7 @@ def cmd_auto(args) -> int:
     newer = None
     try:
         from . import selfupdate
-        newer = selfupdate.check()
+        newer = selfupdate.check() if selfupdate.auto_check_enabled() else None
         if newer:
             lines.append(f"nouvelle version de FreeAV disponible (version {newer.build})")
     except Exception as exc:  # pas de reseau : ce n'est pas un probleme du PC
@@ -374,6 +374,12 @@ def cmd_auto(args) -> int:
 def cmd_app_update(args) -> int:
     from . import selfupdate
     from .repair.platform import System
+    if args.auto_check:
+        selfupdate.set_auto_check(args.auto_check == "on")
+        print("Verification automatique des nouvelles versions : "
+              + ("activee." if args.auto_check == "on" else "desactivee (FreeAV ne contacte plus "
+                 "GitHub tout seul ; app-update reste possible a la main)."))
+        return 0
     try:
         if args.from_file:  # essai de la CI : meme chemin qu'une vraie mise a jour, sans reseau
             if not args.sha256:
@@ -583,6 +589,8 @@ def main(argv: list[str] | None = None) -> int:
     appup = sub.add_parser("app-update", help="installer la derniere version de FreeAV (Windows)")
     appup.add_argument("--check", action="store_true", help="seulement verifier")
     appup.add_argument("--yes", action="store_true", help="installer sans demander")
+    appup.add_argument("--auto-check", choices=["on", "off"],
+                       help="verification automatique (ouverture de FreeAV, entretien quotidien)")
     appup.add_argument("--from-file", help=argparse.SUPPRESS)
     appup.add_argument("--sha256", help=argparse.SUPPRESS)
     appup.add_argument("--build", type=int, default=0, help=argparse.SUPPRESS)
