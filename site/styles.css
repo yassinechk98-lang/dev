@@ -263,6 +263,8 @@ details:nth-of-type(8){--d:.8s}
 .legal code{font:14px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1px 6px;overflow-wrap:anywhere}
 .legal-sum{background:var(--accent-soft);border-left:4px solid var(--accent);border-radius:10px;padding:14px 18px}
 .legal-sum p{margin:0}
+.legal-sum .legal-en{margin-top:6px;font-size:14px;color:var(--muted)}
+.legal .beta{max-width:none;margin:16px 0 0}
 .legal .net-list{list-style:none;padding:0;display:grid;gap:10px;margin:16px 0}
 .net-list li{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:0}
 .net-list strong{display:block;margin-bottom:4px}

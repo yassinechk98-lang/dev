@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Politique de signature du code – FreeAV</title>
+<meta name="description" content="Politique de signature du code de FreeAV : ce qui est signé, comment FreeAV.exe est construit à partir de son code source public sous licence GPL-3.0, qui approuve les signatures et comment signaler un problème.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 2 4 7v8c0 7.5 5.1 13.4 12 15 6.9-1.6 12-7.5 12-15V7z' fill='%2316a34a'/><path d='m11 16 4 4 7-8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="logo" href="./">
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 4 7v8c0 7.5 5.1 13.4 12 15 6.9-1.6 12-7.5 12-15V7z" fill="var(--accent)"/><path d="m11 16 4 4 7-8" stroke="var(--on-accent)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      FreeAV
+    </a>
+    <nav>
+      <a href="./#fonctionnalites">Fonctionnalités</a>
+      <a href="./#nouveautes">Nouveautés</a>
+      <a href="./#protection">Protection</a>
+      <a href="./#reparer">Réparer mon PC</a>
+      <a href="./#telecharger">Télécharger</a>
+      <a href="./#faq">FAQ</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <article class="wrap legal">
+    <p class="back"><a href="./">← Retour à l'accueil</a></p>
+    <h1>Politique de signature du code</h1>
+    <p class="legal-meta">Comment FreeAV.exe est construit et signé · Dernière mise à jour : 11 octobre 2026</p>
+
+    <div class="legal-sum">
+      <p><strong>Signature de code gratuite fournie par SignPath.io, certificat de la SignPath Foundation.</strong></p>
+      <p lang="en" class="legal-en">Free code signing provided by <a href="https://signpath.io" target="_blank" rel="noopener noreferrer">SignPath.io</a>, certificate by <a href="https://signpath.org" target="_blank" rel="noopener noreferrer">SignPath Foundation</a>.</p>
+    </div>
+    <p class="beta"><strong>Statut : en attente de l'accord de la SignPath Foundation.</strong> Les versions actuelles de FreeAV.exe ne sont pas encore signées. Windows peut donc afficher « Windows a protégé votre ordinateur » : <a href="./#avertissement">voici quoi faire</a>.</p>
+
+    <h2>Ce qui est signé</h2>
+    <p>Uniquement FreeAV.exe, construit à partir du code source public de FreeAV. Les logiciels d'autres éditeurs que FreeAV peut installer à votre demande, comme ClamAV de Cisco Talos, sont distribués tels que leur éditeur les publie et ne sont jamais signés par FreeAV.</p>
+
+    <h2>Code source et licence</h2>
+    <p>Le code source de FreeAV est public : <a href="https://github.com/yassinechk98-lang/dev/tree/main/antivirus" target="_blank" rel="noopener noreferrer">github.com/yassinechk98-lang/dev/tree/main/antivirus</a>. Il est distribué sous licence <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU General Public License version 3 (GPL-3.0)</a> : chacun peut le lire, le modifier et le redistribuer, à condition que les versions modifiées restent elles aussi libres et open source.</p>
+
+    <h2>Équipe</h2>
+    <ul>
+      <li>Auteur et relecteur (committer, reviewer) : Yassine (GitHub <a href="https://github.com/yassinechk98-lang" target="_blank" rel="noopener noreferrer">yassinechk98-lang</a>)</li>
+      <li>Approbateur des signatures (approver) : Yassine (GitHub <a href="https://github.com/yassinechk98-lang" target="_blank" rel="noopener noreferrer">yassinechk98-lang</a>)</li>
+    </ul>
+    <p>Les modifications arrivent sur la branche main par des demandes de fusion (pull requests) que Yassine relit et fusionne lui-même.</p>
+
+    <h2>Construction</h2>
+    <p>Chaque version signée sera construite automatiquement par GitHub Actions, sur un serveur Windows hébergé par GitHub, à partir du code de la branche main. Avant la publication, les tests passent sous Windows et l'exécutable est essayé pour de vrai : il doit détecter un fichier de test et laisser passer un fichier sain. Aucune version signée n'est construite sur un ordinateur personnel, et chaque demande de signature sera approuvée à la main. Les étapes de construction sont publiques : <a href="https://github.com/yassinechk98-lang/dev/blob/main/.github/workflows/build-windows.yml" target="_blank" rel="noopener noreferrer">build-windows.yml</a>.</p>
+
+    <h2>Confidentialité</h2>
+    <p>FreeAV n'envoie aucun fichier ni aucune donnée d'utilisation. Il ne se connecte à Internet que pour :</p>
+    <ul>
+      <li>vérifier s'il existe une nouvelle version et la télécharger (<code>github.com</code>, désactivable) ;</li>
+      <li>installer ClamAV si vous le demandez (<code>github.com</code>) et mettre à jour ses signatures (<code>database.clamav.net</code>) ;</li>
+      <li>télécharger des signatures si vous avez enregistré votre clé abuse.ch (<code>mb-api.abuse.ch</code>).</li>
+    </ul>
+    <p>Tous les détails sont sur la page <a href="confidentialite.html">Confidentialité</a>.</p>
+
+    <h2>Signaler un problème</h2>
+    <p>Si vous trouvez un FreeAV.exe signé qui n'a pas été construit de cette façon, ou une faille de sécurité, prévenez-nous. Le signalement privé de GitHub n'est pas encore ouvert sur le dépôt : en attendant, ouvrez un <a href="https://github.com/yassinechk98-lang/dev/issues" target="_blank" rel="noopener noreferrer">ticket sur GitHub</a> intitulé « Sécurité », sans donner de détails, car les tickets sont publics. Un moyen privé vous sera alors proposé pour envoyer les détails.</p>
+  </article>
+</main>
+
+<footer>
+  <div class="wrap">FreeAV (nom de travail) · Projet open source · <a href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="confidentialite.html">Confidentialité</a> · <a href="signature.html">Politique de signature</a></div>
+</footer>
+</body>
+</html>
