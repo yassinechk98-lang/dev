@@ -259,6 +259,7 @@ details:nth-of-type(8){--d:.8s}
 .back a{text-decoration:none}
 .back a:hover{text-decoration:underline}
 .legal h1{font-size:clamp(30px,5vw,40px);line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+.h1-en{display:block;font-size:.5em;font-weight:600;color:var(--muted);letter-spacing:0;margin-top:4px}
 .legal-meta{color:var(--muted);font-size:14px;margin:0 0 24px}
 .legal h2{text-align:left;font-size:22px;margin:36px 0 10px}
 .legal ul{padding-left:22px}

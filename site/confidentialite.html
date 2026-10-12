@@ -45,27 +45,32 @@
     </ul>
 
     <h2>Quand FreeAV se connecte à Internet</h2>
-    <p>FreeAV contacte uniquement les adresses ci-dessous, toujours en HTTPS. Il n'y envoie aucune information sur vous ni sur vos fichiers. Comme pour toute page web, ces serveurs voient votre adresse IP et l'heure de la connexion.</p>
+    <p>FreeAV contacte uniquement les adresses ci-dessous, et ses téléchargements passent toujours par HTTPS. Il n'y envoie aucune information sur vous ni sur vos fichiers. Comme pour toute page web, ces serveurs voient votre adresse IP et l'heure de la connexion.</p>
     <ul class="net-list">
       <li>
         <strong>Recherche d'une nouvelle version de FreeAV</strong>
         <code>github.com</code>
-        <p>À chaque ouverture de FreeAV et pendant l'analyse quotidienne, FreeAV lit un petit fichier public qui indique la dernière version. Si vous cliquez sur « Mettre à jour FreeAV », la nouvelle version est téléchargée au même endroit. Pour arrêter cette vérification, décochez « Chercher les nouvelles versions » : la mise à jour reste possible à la main.</p>
+        <p>À chaque ouverture de FreeAV et pendant l'analyse quotidienne, FreeAV lit un petit fichier public qui indique la dernière version. Si vous cliquez sur « Mettre à jour FreeAV », la nouvelle version est téléchargée au même endroit. Pour arrêter cette vérification, décochez « Chercher les nouvelles versions » : la mise à jour reste possible à la main. Voir la <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">politique de confidentialité de GitHub</a>.</p>
       </li>
       <li>
         <strong>Installation de ClamAV</strong>
         <code>github.com/Cisco-Talos/clamav</code>
-        <p>Seulement quand vous cliquez sur « Installer ClamAV (gratuit) » : FreeAV télécharge ClamAV 1.4.3 depuis la publication officielle de Cisco Talos sur GitHub, qui le sert depuis <code>release-assets.githubusercontent.com</code>. Le fichier est refusé si son empreinte SHA-256 ne correspond pas. Le module RAR de ClamAV, qui n'est pas libre, n'est pas installé.</p>
+        <p>Seulement quand vous cliquez sur « Installer ClamAV (gratuit) » : FreeAV télécharge ClamAV 1.4.3 depuis la publication officielle de Cisco Talos sur GitHub, qui le sert depuis <code>release-assets.githubusercontent.com</code>. Le fichier est refusé si son empreinte SHA-256 ne correspond pas. Le module RAR de ClamAV, qui n'est pas libre, n'est pas installé. Voir la <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">politique de confidentialité de GitHub</a>.</p>
       </li>
       <li>
         <strong>Signatures de ClamAV</strong>
         <code>database.clamav.net</code>
-        <p>Le serveur officiel de ClamAV (Cisco Talos), en HTTPS, à l'installation de ClamAV et quand vous cliquez sur « Mettre à jour ClamAV ». Ce téléchargement est fait par freshclam, l'outil de mise à jour de ClamAV. Comme d'habitude avec ClamAV, il consulte aussi le DNS (<code>current.cvd.clamav.net</code>) pour savoir si de nouvelles signatures existent.</p>
+        <p>Le serveur officiel de ClamAV (Cisco Talos), en HTTPS, à l'installation de ClamAV et quand vous cliquez sur « Mettre à jour ClamAV ». Ce téléchargement est fait par freshclam, l'outil de mise à jour de ClamAV. Comme d'habitude avec ClamAV, il consulte aussi le DNS (<code>current.cvd.clamav.net</code>) pour savoir si de nouvelles signatures existent. Voir la <a href="https://www.cisco.com/c/en/us/about/legal/privacy-full.html" target="_blank" rel="noopener noreferrer">déclaration de confidentialité de Cisco</a>.</p>
       </li>
       <li>
         <strong>Signatures MalwareBazaar</strong>
         <code>mb-api.abuse.ch</code>
-        <p>Seulement si vous avez enregistré une clé gratuite abuse.ch : quand vous cliquez sur « Mettre à jour les signatures », et chaque jour si la protection automatique est active. Votre clé est envoyée à abuse.ch, et à personne d'autre.</p>
+        <p>Seulement si vous avez enregistré une clé gratuite abuse.ch : quand vous cliquez sur « Mettre à jour les signatures », et chaque jour si la protection automatique est active. Votre clé est envoyée à abuse.ch, et à personne d'autre. La politique de confidentialité d'abuse.ch est indiquée sur <a href="https://auth.abuse.ch/" target="_blank" rel="noopener noreferrer">auth.abuse.ch</a>, là où vous créez votre clé.</p>
+      </li>
+      <li>
+        <strong>Réparer mon PC : outil DISM de Windows</strong>
+        <code>Windows Update</code>
+        <p>Seulement si vous lancez « Réparer l'image de Windows » (bouton « Lancer DISM ») dans « Réparer mon PC » : cet outil de Windows peut télécharger des fichiers système sains depuis Windows Update. C'est Windows qui se connecte alors, avec ses propres réglages, et non FreeAV. Voir la <a href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener noreferrer">déclaration de confidentialité de Microsoft</a>.</p>
       </li>
     </ul>
     <p>Les téléchargements sont vérifiés avant d'être utilisés : une mise à jour falsifiée ou incomplète est refusée.</p>
@@ -82,13 +87,13 @@
     <p>Rien de tout cela n'est envoyé ailleurs.</p>
 
     <h2>Supprimer vos données</h2>
-    <p>Désinstallez FreeAV depuis Paramètres &gt; Applications, ou cliquez sur « Tout retirer » si vous ne l'avez pas installé. Vos données personnelles sont gardées dans le dossier <code>.freeav</code> de votre profil, au cas où vous réinstalleriez FreeAV : supprimez ce dossier pour tout effacer.</p>
+    <p>Désinstallez FreeAV depuis Paramètres &gt; Applications, ou, si vous ne l'avez pas installé, cliquez sur « Tout retirer », puis supprimez FreeAV.exe et, si vous aviez installé ClamAV, le dossier <code>%LOCALAPPDATA%\FreeAV</code>. Vos données personnelles sont gardées dans le dossier <code>.freeav</code> de votre profil, au cas où vous réinstalleriez FreeAV : supprimez ce dossier pour tout effacer.</p>
 
     <h2>Ce site</h2>
-    <p>Ce site n'utilise ni cookies, ni mesure d'audience, ni publicité, ni polices ou scripts venant d'autres sites, et n'a aucun formulaire. Il est hébergé par Netlify, qui reçoit, comme tout hébergeur, l'adresse IP et le navigateur des visiteurs pour afficher les pages (<a href="https://www.netlify.com/privacy/" target="_blank" rel="noopener noreferrer">politique de Netlify</a>). Le fichier FreeAV.exe est téléchargé depuis GitHub (<a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">politique de GitHub</a>).</p>
+    <p>Ce site n'utilise ni cookies, ni mesure d'audience, ni publicité, ni polices ou scripts venant d'autres sites, et n'a aucun formulaire. Il est hébergé par Netlify, qui reçoit, comme tout hébergeur, l'adresse IP et le navigateur des visiteurs pour afficher les pages (<a href="https://www.netlify.com/privacy/" target="_blank" rel="noopener noreferrer">politique de Netlify</a>). Le fichier FreeAV.exe est téléchargé depuis GitHub (<a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">politique de confidentialité de GitHub</a>).</p>
 
     <h2>Contact</h2>
-    <p>Pour toute question sur vos données, ouvrez un ticket sur <a href="https://github.com/yassinechk98-lang/dev/issues" target="_blank" rel="noopener noreferrer">GitHub</a>. Les tickets sont publics : n'y mettez pas d'informations personnelles. FreeAV est un logiciel libre (GPL-3.0) publié par yassinechk98-lang sur GitHub, et son <a href="https://github.com/yassinechk98-lang/dev/tree/main/antivirus" target="_blank" rel="noopener noreferrer">code source</a> peut être vérifié par tous.</p>
+    <p>Pour toute question sur vos données, ouvrez un ticket sur <a href="https://github.com/yassinechk98-lang/dev/issues" target="_blank" rel="noopener noreferrer">GitHub</a>. Les tickets sont publics : n'y mettez pas d'informations personnelles. FreeAV est un logiciel libre (GPL-3.0 ou ultérieure) publié par yassinechk98-lang sur GitHub, et son <a href="https://github.com/yassinechk98-lang/dev/tree/main/antivirus" target="_blank" rel="noopener noreferrer">code source</a> peut être vérifié par tous.</p>
 
     <h2>Modifications</h2>
     <p>Cette page est mise à jour quand FreeAV change sa façon d'utiliser Internet. La date en haut de la page indique la dernière modification.</p>
@@ -96,7 +101,7 @@
 </main>
 
 <footer>
-  <div class="wrap">FreeAV (nom de travail) · Logiciel libre (GPL-3.0) · <a href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="confidentialite.html">Confidentialité</a> · <a href="signature.html">Politique de signature</a></div>
+  <div class="wrap">FreeAV · Logiciel libre (GPL-3.0 ou ultérieure) · <a href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="confidentialite.html">Confidentialité</a> · <a href="signature.html">Politique de signature du code (Code signing policy)</a></div>
 </footer>
 </body>
 </html>

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FreeAV – Antivirus gratuit et open source</title>
-<meta name="description" content="FreeAV est un antivirus gratuit pour Windows et un logiciel libre (GPL-3.0) : analyse rapide en un clic, détection par signatures et moteur ClamAV, protection en temps réel, clés USB analysées, mises à jour en un clic et réparation du PC. Sans publicité ni abonnement.">
+<title>FreeAV – Antivirus gratuit et libre</title>
+<meta name="description" content="FreeAV est un antivirus gratuit pour Windows et un logiciel libre (GPL-3.0 ou ultérieure) : analyse rapide en un clic, détection par signatures et moteur ClamAV, protection en temps réel, clés USB analysées, mises à jour en un clic et réparation du PC. Sans publicité ni abonnement.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 2 4 7v8c0 7.5 5.1 13.4 12 15 6.9-1.6 12-7.5 12-15V7z' fill='%2316a34a'/><path d='m11 16 4 4 7-8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <script>document.documentElement.classList.add('js')</script>
 <link rel="stylesheet" href="styles.css">
@@ -89,7 +89,7 @@
         <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="M9.5 12.5 11 14l3.5-3.5"/></svg></div>
           <h3>Respect de la vie privée</h3>
-          <p>Tout se passe sur votre ordinateur. Aucun fichier n'est envoyé ailleurs.</p>
+          <p>Tout se passe sur votre ordinateur : FreeAV n'envoie aucun fichier. Seule exception, le deuxième avis facultatif de Microsoft Defender : sa protection dans le cloud peut envoyer des échantillons à Microsoft, selon vos réglages Windows. <a href="confidentialite.html">Détails</a></p>
         </div>
         <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div>
@@ -99,7 +99,7 @@
         <div class="card reveal">
           <div class="icon"><svg viewBox="0 0 24 24"><path d="m8 6-6 6 6 6"/><path d="m16 6 6 6-6 6"/></svg></div>
           <h3>Logiciel libre</h3>
-          <p>Sous licence GPL-3.0 : le code est public, chacun peut le vérifier, l'améliorer et le partager.</p>
+          <p>Sous licence GPL-3.0 ou ultérieure : le code est public, chacun peut le vérifier, l'améliorer et le partager.</p>
         </div>
       </div>
     </div>
@@ -109,7 +109,7 @@
     <div class="wrap">
       <p class="center reveal"><span class="badge">Nouveau</span></p>
       <h2 class="reveal">Plus complet, et toujours gratuit</h2>
-      <p class="sub reveal">FreeAV analyse en un clic les endroits à risque, ajoute de vrais moteurs antivirus, s'installe comme un logiciel classique et se met à jour avec votre accord. Et c'est désormais un logiciel libre, sous licence GPL-3.0.</p>
+      <p class="sub reveal">FreeAV analyse en un clic les endroits à risque, ajoute de vrais moteurs antivirus, s'installe comme un logiciel classique et se met à jour avec votre accord. Et c'est désormais un logiciel libre, sous licence GPL-3.0 ou ultérieure.</p>
       <div class="new-grid">
         <div class="reveal">
           <div class="scan-demo app-demo clam-ok upd" id="appDemo" role="img" aria-label="Démonstration animée : dans FreeAV, la protection en temps réel est activée et le bandeau passe au vert, ClamAV s'installe en un clic, FreeAV propose sa nouvelle version et se met à jour, puis une analyse rapide se lance.">
@@ -198,7 +198,7 @@
             </ul>
             <div class="auto-foot"><span class="live"></span><span>Et à chaque ouverture de session, la protection en temps réel démarre.</span></div>
           </div>
-          <p class="prot-small">Le bouton « Tout retirer » enlève tout en un clic. L'installation et le retrait ont été testés sur un vrai PC Windows.</p>
+          <p class="prot-small">Le bouton « Tout retirer » enlève la tâche quotidienne et le démarrage automatique en un clic. L'installation et le retrait ont été testés sur un vrai PC Windows.</p>
         </article>
       </div>
       <p class="beta reveal"><strong>Ce que la protection en temps réel ne fait pas.</strong> Elle vérifie les fichiers juste après leur arrivée dans Téléchargements et Bureau, et les clés USB quand vous les branchez. Elle ne surveille pas tout le disque et n'empêche pas l'ouverture d'un fichier comme le pilote d'un antivirus payant. Gardez Microsoft Defender activé : FreeAV vient en complément.</p>
@@ -302,7 +302,7 @@
         <a class="btn btn-primary btn-big shine dl-link" href="https://github.com/yassinechk98-lang/dev/releases/download/freeav-test/FreeAV.exe"><svg class="dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Télécharger FreeAV pour Windows</a>
         <p class="update-note"><strong>Vous aviez déjà FreeAV ?</strong> Mettez-le à jour avant d'installer ClamAV : les versions d'avant le 12 octobre 2026 ne trouvent plus ClamAV. Cliquez sur « Mettre à jour FreeAV ». Si votre copie date d'avant le 11 octobre 2026, elle n'a pas ce bouton : téléchargez-la encore une fois ici. Ensuite, c'est FreeAV qui vous proposera chaque nouvelle version.</p>
         <p class="defender-note"><strong>Analysé par Microsoft Defender.</strong> Chaque FreeAV.exe publié est analysé par Microsoft Defender pendant sa construction, avec des signatures à jour et un contrôle sur le fichier de test EICAR. Le résultat est écrit dans les <a href="https://github.com/yassinechk98-lang/dev/releases/tag/freeav-test" target="_blank" rel="noopener noreferrer">notes de version</a> : au 12 octobre 2026, aucune menace détectée (signatures 1.459.688.0). Ce contrôle n'est ni une validation ni une certification par Microsoft.</p>
-        <p class="dl-links"><a href="https://github.com/yassinechk98-lang/dev/releases/download/freeav-test/FreeAV.exe.sha256">Empreinte SHA-256</a> · <a href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener noreferrer">Code source sur GitHub</a> · <a href="signature.html">Politique de signature du code</a> · <a href="https://github.com/yassinechk98-lang/dev/blob/main/antivirus/LICENSE" target="_blank" rel="noopener noreferrer">Licence GPL-3.0</a> · macOS et Linux : depuis le code source</p>
+        <p class="dl-links"><a href="https://github.com/yassinechk98-lang/dev/releases/download/freeav-test/FreeAV.exe.sha256">Empreinte SHA-256</a> · <a href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener noreferrer">Code source sur GitHub</a> · <a href="signature.html">Politique de signature du code (Code signing policy)</a> · <a href="https://github.com/yassinechk98-lang/dev/blob/main/antivirus/LICENSE" target="_blank" rel="noopener noreferrer">Licence GPL-3.0 ou ultérieure</a> · macOS et Linux : depuis le code source</p>
 
         <div class="smartscreen" id="avertissement">
           <div class="ss-mock" aria-hidden="true">
@@ -335,7 +335,7 @@
       <details class="reveal"><summary>FreeAV remplace-t-il Windows Defender ?</summary><p>Non, il le complète. La protection en temps réel de FreeAV surveille Téléchargements et Bureau et vérifie les fichiers juste après leur arrivée, mais elle n'empêche pas l'ouverture d'un fichier comme le fait Microsoft Defender. Gardez Defender activé.</p></details>
       <details class="reveal"><summary>Mes fichiers sont-ils envoyés sur Internet ?</summary><p>Non. L'analyse se fait entièrement sur votre PC, ClamAV compris. FreeAV se connecte seulement pour télécharger des signatures et ClamAV, et pour vérifier sur github.com s'il existe une nouvelle version de FreeAV (décochez « Chercher les nouvelles versions » pour l'arrêter). Si vous gardez le deuxième avis de Microsoft Defender, Defender suit ses propres réglages Windows, comme d'habitude. Tous les détails sont sur la page <a href="confidentialite.html">Confidentialité</a>.</p></details>
       <details class="reveal"><summary>Comment mettre à jour FreeAV ?</summary><p>FreeAV vous prévient à son ouverture quand une nouvelle version existe, et l'analyse quotidienne aussi. Cliquez sur « Mettre à jour FreeAV » : il la télécharge, vérifie son empreinte, remplace l'ancienne version et redémarre. Rien ne change sans votre accord. Si vous avez téléchargé FreeAV avant le 11 octobre 2026, téléchargez-le une fois de plus <a href="#telecharger">depuis cette page</a> : cette version-là ne sait pas encore se mettre à jour. Une version d'avant le 12 octobre 2026 doit être mise à jour avant que « Installer ClamAV » fonctionne.</p></details>
-      <details class="reveal"><summary>Comment désinstaller FreeAV ?</summary><p>Si vous l'avez installé avec « Installer FreeAV sur ce PC », désinstallez-le depuis Paramètres &gt; Applications, comme n'importe quel logiciel : sa protection automatique est retirée aussi. Sinon, cliquez sur « Tout retirer » dans FreeAV, puis supprimez FreeAV.exe. Votre quarantaine et votre journal restent dans le dossier .freeav de votre profil.</p></details>
+      <details class="reveal"><summary>Comment désinstaller FreeAV ?</summary><p>Si vous l'avez installé avec « Installer FreeAV sur ce PC », désinstallez-le depuis Paramètres &gt; Applications, comme n'importe quel logiciel : sa protection automatique est retirée aussi. Sinon, cliquez sur « Tout retirer » dans FreeAV, puis supprimez FreeAV.exe et, si vous aviez installé ClamAV, le dossier %LOCALAPPDATA%\FreeAV. Votre quarantaine et votre journal restent dans le dossier .freeav de votre profil.</p></details>
       <details class="reveal"><summary>« Réparer mon PC » peut-il abîmer mon ordinateur ?</summary><p>Le diagnostic ne modifie rien. Ensuite, FreeAV ne répare que ce que vous choisissez et sauvegarde chaque modification pour pouvoir l'annuler. Le nettoyage des fichiers temporaires et les outils Windows ne s'annulent pas : c'est indiqué avant de les lancer. La fonction est encore en test, gardez une sauvegarde de vos fichiers importants.</p></details>
       <details class="reveal"><summary>Pourquoi Windows affiche-t-il un avertissement ?</summary><p>FreeAV n'est pas encore signé numériquement, et Windows SmartScreen se méfie des applications qu'il ne connaît pas encore. Cliquez sur « Informations complémentaires » puis sur « Exécuter quand même ». Pour vérifier que votre fichier est bien l'original, comparez-le avec l'<a href="https://github.com/yassinechk98-lang/dev/releases/download/freeav-test/FreeAV.exe.sha256">empreinte SHA-256</a> publiée.</p></details>
     </div>
@@ -343,7 +343,7 @@
 </main>
 
 <footer>
-  <div class="wrap">FreeAV (nom de travail) · Logiciel libre (GPL-3.0) · <a href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="confidentialite.html">Confidentialité</a> · <a href="signature.html">Politique de signature</a></div>
+  <div class="wrap">FreeAV · Logiciel libre (GPL-3.0 ou ultérieure) · <a href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="confidentialite.html">Confidentialité</a> · <a href="signature.html">Politique de signature du code (Code signing policy)</a></div>
 </footer>
 
 <div class="toast" id="dlToast" role="status" aria-live="polite"></div>
