@@ -133,7 +133,10 @@
       later(8400, function(){ press(a.upd); });
       later(8750, function(){ a.note.textContent = 'Téléchargement et vérification de la nouvelle version…'; });
       later(10300, function(){ app.classList.remove('upd'); a.note.textContent = 'FreeAV a redémarré : il est à jour'; });
-      later(14000, appCycle);
+      later(11900, function(){ press(a.quick); });
+      later(12200, function(){ a.note.textContent = 'Analyse rapide en cours…'; });
+      later(13900, function(){ a.note.textContent = 'Analyse rapide terminée : aucune menace'; });
+      later(17000, appCycle);
     };
     startWhenVisible(app, appCycle, appFinal);
   }

@@ -233,6 +233,7 @@ footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font
 .js .app-demo:not(.upd) [data-a="upd"]{display:none}
 .app-demo.upd [data-a="upd"]{animation:popIn .45s cubic-bezier(.3,1.6,.5,1) backwards}
 .app-row{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:14px}
+.app-actions{display:flex;gap:8px;flex-wrap:wrap;padding-bottom:10px;margin-bottom:4px;border-bottom:1px solid var(--border)}
 .app-clam{justify-content:space-between;flex-wrap:wrap;min-height:52px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:4px 0}
 .clam-state{color:var(--muted);transition:color .3s}
 .app-demo.clam-ok .clam-state{color:var(--accent-strong);font-weight:600}
@@ -245,6 +246,8 @@ footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font
 .app-demo.inst.fill .app-bar span{transform:scaleX(1)}
 .app-note{margin-top:8px;font-size:13px;color:var(--muted);min-height:1.5em}
 .demo-cap{color:var(--muted);font-size:14px;margin:12px 4px 0}
+.defender-note{max-width:620px;margin:12px auto 0;text-align:left;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent-2);border-radius:10px;padding:12px 16px;font-size:14px;color:var(--muted)}
+.defender-note strong{color:var(--text)}
 .update-note{max-width:620px;margin:18px auto 0;text-align:left;background:var(--accent-soft);border-left:4px solid var(--accent);border-radius:10px;padding:12px 16px;font-size:14px;color:var(--text)}
 .steps > :nth-child(6){--d:.6s}
 details:nth-of-type(7){--d:.7s}

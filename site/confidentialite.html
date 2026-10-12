@@ -30,7 +30,7 @@
   <article class="wrap legal">
     <p class="back"><a href="./">← Retour à l'accueil</a></p>
     <h1>Confidentialité</h1>
-    <p class="legal-meta">Politique de confidentialité de l'application FreeAV et de ce site · Dernière mise à jour : 11 octobre 2026</p>
+    <p class="legal-meta">Politique de confidentialité de l'application FreeAV et de ce site · Dernière mise à jour : 12 octobre 2026</p>
 
     <div class="legal-sum">
       <p><strong>En bref.</strong> FreeAV n'a ni compte, ni publicité, ni mesure d'audience. Il n'envoie ni vos fichiers, ni aucune donnée sur votre utilisation. Il ne se connecte à Internet que pour se mettre à jour et installer ClamAV si vous le demandez, aux adresses listées ci-dessous, et vous pouvez couper la recherche de nouvelles versions.</p>
@@ -54,13 +54,13 @@
       </li>
       <li>
         <strong>Installation de ClamAV</strong>
-        <code>github.com</code>
-        <p>Seulement quand vous cliquez sur « Installer ClamAV (gratuit) », pour télécharger le moteur officiel ClamAV.</p>
+        <code>github.com/Cisco-Talos/clamav</code>
+        <p>Seulement quand vous cliquez sur « Installer ClamAV (gratuit) » : FreeAV télécharge ClamAV 1.4.3 depuis la publication officielle de Cisco Talos sur GitHub, qui le sert depuis <code>release-assets.githubusercontent.com</code>. Le fichier est refusé si son empreinte SHA-256 ne correspond pas. Le module RAR de ClamAV, qui n'est pas libre, n'est pas installé.</p>
       </li>
       <li>
         <strong>Signatures de ClamAV</strong>
         <code>database.clamav.net</code>
-        <p>Le serveur officiel de ClamAV (Cisco Talos), à l'installation de ClamAV et quand vous cliquez sur « Mettre à jour ClamAV ».</p>
+        <p>Le serveur officiel de ClamAV (Cisco Talos), en HTTPS, à l'installation de ClamAV et quand vous cliquez sur « Mettre à jour ClamAV ». Ce téléchargement est fait par freshclam, l'outil de mise à jour de ClamAV. Comme d'habitude avec ClamAV, il consulte aussi le DNS (<code>current.cvd.clamav.net</code>) pour savoir si de nouvelles signatures existent.</p>
       </li>
       <li>
         <strong>Signatures MalwareBazaar</strong>
@@ -88,7 +88,7 @@
     <p>Ce site n'utilise ni cookies, ni mesure d'audience, ni publicité, ni polices ou scripts venant d'autres sites, et n'a aucun formulaire. Il est hébergé par Netlify, qui reçoit, comme tout hébergeur, l'adresse IP et le navigateur des visiteurs pour afficher les pages (<a href="https://www.netlify.com/privacy/" target="_blank" rel="noopener noreferrer">politique de Netlify</a>). Le fichier FreeAV.exe est téléchargé depuis GitHub (<a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">politique de GitHub</a>).</p>
 
     <h2>Contact</h2>
-    <p>Pour toute question sur vos données, ouvrez un ticket sur <a href="https://github.com/yassinechk98-lang/dev/issues" target="_blank" rel="noopener noreferrer">GitHub</a>. Les tickets sont publics : n'y mettez pas d'informations personnelles. FreeAV est un projet open source publié par yassinechk98-lang sur GitHub, et son <a href="https://github.com/yassinechk98-lang/dev/tree/main/antivirus" target="_blank" rel="noopener noreferrer">code source</a> peut être vérifié par tous.</p>
+    <p>Pour toute question sur vos données, ouvrez un ticket sur <a href="https://github.com/yassinechk98-lang/dev/issues" target="_blank" rel="noopener noreferrer">GitHub</a>. Les tickets sont publics : n'y mettez pas d'informations personnelles. FreeAV est un logiciel libre (GPL-3.0) publié par yassinechk98-lang sur GitHub, et son <a href="https://github.com/yassinechk98-lang/dev/tree/main/antivirus" target="_blank" rel="noopener noreferrer">code source</a> peut être vérifié par tous.</p>
 
     <h2>Modifications</h2>
     <p>Cette page est mise à jour quand FreeAV change sa façon d'utiliser Internet. La date en haut de la page indique la dernière modification.</p>
@@ -96,7 +96,7 @@
 </main>
 
 <footer>
-  <div class="wrap">FreeAV (nom de travail) · Projet open source · <a href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="confidentialite.html">Confidentialité</a> · <a href="signature.html">Politique de signature</a></div>
+  <div class="wrap">FreeAV (nom de travail) · Logiciel libre (GPL-3.0) · <a href="https://github.com/yassinechk98-lang/dev" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="confidentialite.html">Confidentialité</a> · <a href="signature.html">Politique de signature</a></div>
 </footer>
 </body>
 </html>
