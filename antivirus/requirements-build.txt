@@ -1,3 +1,7 @@
-# Outils pour construire FreeAV.exe (versions figees : un exe d'antivirus doit etre reproductible)
+# Outils pour construire FreeAV.exe (versions figees : un exe d'antivirus doit etre reproductible).
+# C'est le seul fichier installe par la CI Windows.
 pyinstaller==6.16.0
 pillow==11.3.0
+pytest==8.4.2
+# Moteur YARA inclus dans FreeAV.exe (licences dans THIRD_PARTY_NOTICES.txt)
+yara-python==4.5.4

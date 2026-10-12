@@ -2,6 +2,7 @@
 
 Scanner de fichiers en Python. Il fonctionne avec la seule bibliotheque standard ; le moteur YARA
 est optionnel (`pip install -r requirements-optional.txt`). Python 3.10 ou plus recent.
+FreeAV.exe contient le moteur YARA (yara-python, version figee dans `requirements-build.txt`).
 
 ## Fonctionnalites
 
@@ -33,10 +34,12 @@ est optionnel (`pip install -r requirements-optional.txt`). Python 3.10 ou plus 
   session. `freeav schedule --remove` retire tout, `--status` montre ce qui est actif.
 - **Moteurs antivirus complets** en plus des signatures FreeAV :
   - **ClamAV integre** (Windows) : un clic sur **Installer ClamAV** (ou `freeav clamav --install`)
-    installe la version officielle de ClamAV (Cisco Talos) dans `%LOCALAPPDATA%\FreeAV\ClamAV`,
-    sans droits administrateur, avec ses signatures officielles (environ 300 Mo, mises a jour par
-    `freeav clamav --update`). Elle est ensuite utilisee a chaque analyse. Le paquet est verifie par
-    son empreinte SHA-256, inscrite dans FreeAV.exe.
+    telecharge la version officielle de ClamAV directement depuis la release de Cisco Talos sur
+    GitHub et l'installe dans `%LOCALAPPDATA%\FreeAV\ClamAV`, sans droits administrateur, avec ses
+    signatures officielles (environ 300 Mo, mises a jour par `freeav clamav --update`). Elle est
+    ensuite utilisee a chaque analyse. Le paquet est verifie par son empreinte SHA-256, inscrite dans
+    FreeAV.exe. Le module RAR de ClamAV (`libclamunrar`), dont la licence n'est pas libre, n'est pas
+    installe : l'interieur des archives RAR n'est pas analyse par ClamAV.
   - **Deuxieme avis Microsoft Defender** (case cochee par defaut sous Windows, `--defender` en ligne
     de commande) : FreeAV demande a Defender d'analyser les memes dossiers sans rien supprimer, puis
     met lui-meme les menaces en quarantaine.
@@ -149,3 +152,27 @@ La protection en temps reel verifie les fichiers apres leur arrivee dans les dos
 commercial, et ne surveille pas tout le disque. Aucun antivirus,
 gratuit ou payant, ne detecte toutes les menaces : FreeAV complete les bonnes pratiques
 (mises a jour du systeme, sauvegardes, prudence avec les pieces jointes), il ne les remplace pas.
+
+## Licence
+
+Copyright (C) 2026 Yassine.
+
+FreeAV est un logiciel libre : vous pouvez le redistribuer et/ou le modifier selon les termes de la
+GNU General Public License telle que publiee par la Free Software Foundation, soit la version 3 de
+la licence, soit (a votre choix) toute version ulterieure (GPL-3.0-or-later).
+
+FreeAV est distribue dans l'espoir qu'il sera utile, mais SANS AUCUNE GARANTIE ; sans meme la
+garantie implicite de QUALITE MARCHANDE ou d'ADEQUATION A UN USAGE PARTICULIER. Voir la GNU General
+Public License pour plus de details : texte complet dans [LICENSE](LICENSE).
+
+Cette licence couvre le dossier `antivirus/` et les scripts qui construisent et testent FreeAV
+(`.github/workflows/build-windows.yml` et `.github/workflows/antivirus-tests.yml`). Elle ne couvre
+pas les autres projets du depot.
+
+ClamAV, que FreeAV peut installer a votre demande, est un programme separe de Cisco Talos sous sa
+propre licence (GPLv2) : https://github.com/Cisco-Talos/clamav. FreeAV ne le redistribue pas : il le
+telecharge depuis la release officielle de Cisco, et le lance comme un programme a part.
+
+FreeAV.exe contient d'autres logiciels libres (Python, Tcl/Tk, OpenSSL, YARA, le chargeur de
+PyInstaller...). Leurs licences sont reproduites dans [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt),
+inclus dans FreeAV.exe et joint a chaque version publiee.

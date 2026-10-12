@@ -3,8 +3,14 @@
 telecharge ses signatures officielles avec freshclam (environ 300 Mo, mises a jour chaque
 jour par Talos).
 
-Le paquet ClamAV est construit par la CI depuis la release officielle (empreinte verifiee) et
-FreeAV.exe contient son empreinte SHA-256 (data/clamav.json) : un paquet modifie est refuse.
+FreeAV ne redistribue pas ClamAV : il le telecharge directement depuis la release officielle de
+Cisco Talos sur GitHub. FreeAV.exe contient l'adresse et l'empreinte SHA-256 de ce paquet
+(data/clamav.json, ecrit par la CI) : un paquet modifie est refuse. Le module RAR de ClamAV
+(libclamunrar), dont la licence n'est pas libre, n'est pas installe : ClamAV fonctionne sans,
+il n'analyse simplement pas l'interieur des archives RAR.
+
+ClamAV reste un programme separe (clamscan, freshclam), lance en ligne de commande : il n'est
+jamais charge dans FreeAV (sa licence, GPL-2.0, ne le permettrait pas avec la GPL-3.0).
 L'analyse se fait entierement sur le PC (clamscan) ; rien n'est envoye.
 """
 
@@ -26,6 +32,8 @@ from .updater import _HttpsOnlyRedirects
 MANIFEST = Path(__file__).parent / "data" / "clamav.json"  # ecrit par la CI Windows
 MAX_PACKAGE = 300 * 1024 * 1024
 FREEAV_TEST_RELEASE = "https://github.com/yassinechk98-lang/dev/releases/download/"
+CISCO_RELEASE = "https://github.com/Cisco-Talos/clamav/releases/download/"
+NON_FREE = ("libclamunrar",)  # module RAR de ClamAV, licence non libre : pas installe
 
 
 class ClamavError(Exception):
@@ -43,7 +51,7 @@ def manifest() -> dict | None:
         data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    if not (isinstance(data, dict) and str(data.get("url", "")).startswith(FREEAV_TEST_RELEASE)
+    if not (isinstance(data, dict) and str(data.get("url", "")).startswith(CISCO_RELEASE)
             and len(str(data.get("sha256", ""))) == 64):
         return None
     return data
@@ -203,17 +211,21 @@ def _check_hash(path: Path, sha256: str) -> None:
 
 
 def _safe_extract(package: Path, dest: Path) -> None:
-    """Extraction sans sortir du dossier (noms en ../ ou absolus refuses, pas de liens)."""
+    """Extraction sans sortir du dossier (noms en ../ ou absolus refuses, pas de liens), sans
+    le module RAR non libre."""
     dest.mkdir(parents=True)
     base = dest.resolve()
     with zipfile.ZipFile(package) as archive:
+        members = []
         for member in archive.infolist():
             target = (dest / member.filename).resolve()
             if base not in target.parents and target != base:
                 raise ClamavError(f"paquet ClamAV invalide ({member.filename})")
             if (member.external_attr >> 16) & 0o170000 == 0o120000:
                 raise ClamavError("paquet ClamAV invalide (lien symbolique)")
-        archive.extractall(dest)
+            if not Path(member.filename).name.lower().startswith(NON_FREE):
+                members.append(member)
+        archive.extractall(dest, members)
 
 
 def _run(args: list[str], timeout: float) -> subprocess.CompletedProcess:

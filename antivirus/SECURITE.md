@@ -67,7 +67,8 @@
 
 - **CodeQL** analyse le code a chaque PR et chaque semaine (`.github/workflows/codeql.yml`).
 - **Moteurs externes** : ClamAV integre analyse sur le PC (clamscan) et ne se met a jour qu'aupres
-  du miroir officiel `database.clamav.net` ; son paquet est refuse si son empreinte SHA-256 ne
+  du miroir officiel `database.clamav.net` ; son paquet vient de la release officielle de Cisco Talos
+  (`github.com/Cisco-Talos/clamav`) et il est refuse si son empreinte SHA-256 ne
   correspond pas a celle inscrite dans FreeAV.exe, et son archive ne peut rien ecrire hors de son
   dossier. Microsoft Defender est lance avec `-DisableRemediation` et suit ses propres reglages de
   confidentialite, deja actifs sur le PC.
@@ -80,7 +81,8 @@
   modifiables sans droits) : la nouvelle version prend le relais a la prochaine session. Limite : l'empreinte vient
   de la meme page GitHub que le programme ; FreeAV fait donc confiance au compte GitHub du projet,
   comme pour le telechargement direct (FreeAV.exe n'est pas signe).
-- **Outils de construction figes** (`requirements-build.txt`) pour FreeAV.exe.
+- **Outils de construction figes** (`requirements-build.txt`, seul fichier installe par la CI Windows) pour
+  FreeAV.exe, y compris yara-python et pytest.
 - **Dependabot** propose les mises a jour de securite des dependances et des actions GitHub.
 - Les workflows n'ont que les droits en lecture dont ils ont besoin.
 

@@ -147,13 +147,27 @@ def test_clamav_package_with_path_traversal_is_refused(tmp_path):
     assert not (tmp_path / "evil.dll").exists()
 
 
-def test_manifest_only_accepts_freeav_release_urls(tmp_path, monkeypatch):
+def test_non_free_rar_module_is_not_installed(tmp_path):
+    package = make_package(tmp_path, {"clamav-1.4.3.win.x64/libclamunrar.dll": b"MZ",
+                                      "clamav-1.4.3.win.x64/libclamunrar_iface.dll": b"MZ",
+                                      "clamav-1.4.3.win.x64/libclamav.dll": b"MZ"})
+    local = LocalClamav(tmp_path / "ClamAV", runner=fake_clamav_runner()[0])
+    local.install(package=package)
+    names = {p.name for p in (local.root / "program").rglob("*")}
+    assert "libclamav.dll" in names and not any(n.startswith("libclamunrar") for n in names)
+
+
+def test_manifest_only_accepts_the_official_cisco_release(tmp_path, monkeypatch):
     m = tmp_path / "clamav.json"
     monkeypatch.setattr(clamav_local, "MANIFEST", m)
     m.write_text(json.dumps({"url": "https://evil.example/clamav.zip", "sha256": "a" * 64}))
     assert clamav_local.manifest() is None
+    # FreeAV ne republie plus ClamAV : l'ancien paquet de la release freeav-test est refuse
     m.write_text(json.dumps({"url": clamav_local.FREEAV_TEST_RELEASE + "freeav-test/FreeAV-ClamAV.zip",
                              "sha256": "a" * 64}))
+    assert clamav_local.manifest() is None
+    m.write_text(json.dumps({"url": clamav_local.CISCO_RELEASE
+                             + "clamav-1.4.3/clamav-1.4.3.win.x64.zip", "sha256": "a" * 64}))
     assert clamav_local.manifest()["sha256"] == "a" * 64
 
 
@@ -242,6 +256,7 @@ def test_real_clamav_install_update_and_scan(tmp_path):
     local = LocalClamav(tmp_path / "ClamAV")
     local.install(package=Path(os.environ["FREEAV_CLAMAV_ZIP"]), progress=print)
     assert local.ready()
+    assert not list((local.root / "program").rglob("libclamunrar*"))  # ClamAV marche sans RAR
     sample = tmp_path / "echantillon" / "eicar.com"
     sample.parent.mkdir()
     sample.write_bytes(EICAR)
