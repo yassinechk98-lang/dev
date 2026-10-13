@@ -125,6 +125,15 @@ def _powershell(system: System, script: str, exe) -> None:
         raise InstallError((result.stderr or result.stdout or "raccourcis impossibles").strip()[-300:])
 
 
+def planned_changes(system: System) -> list[str]:
+    """Ce que install() va changer sur le PC, a montrer avant de le faire."""
+    exe = target_exe(system)
+    return [f"copie de FreeAV.exe dans {exe.parent} (pour cet utilisateur, sans droits administrateur)",
+            "raccourcis FreeAV dans le menu Demarrer et sur le Bureau",
+            f"« {MENU_LABEL} » dans le clic droit de l'Explorateur",
+            "FreeAV dans Parametres > Applications, d'ou il se desinstalle completement"]
+
+
 def install(system: System, source: Path | None = None) -> list[str]:
     """Installe (ou met a jour) FreeAV pour l'utilisateur courant. Retourne les etapes faites."""
     if not system.is_windows:

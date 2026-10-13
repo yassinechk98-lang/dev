@@ -153,6 +153,14 @@ commercial, et ne surveille pas tout le disque. Aucun antivirus,
 gratuit ou payant, ne detecte toutes les menaces : FreeAV complete les bonnes pratiques
 (mises a jour du systeme, sauvegardes, prudence avec les pieces jointes), il ne les remplace pas.
 
+## Politique de signature du code (Code signing policy)
+
+Code signing policy / Politique de signature du code :
+https://freeav-antivirus-gratuit.netlify.app/signature.html (ce qui est signe, par qui, comment
+FreeAV.exe est construit). Confidentialite : https://freeav-antivirus-gratuit.netlify.app/confidentialite.html,
+resumee par FreeAV a sa premiere ouverture, avec deux choix : chercher les nouvelles versions
+(github.com) et le 2e avis Microsoft Defender. FreeAV ne se connecte a rien avant ce choix.
+
 ## Licence
 
 Copyright (C) 2026 Yassine.

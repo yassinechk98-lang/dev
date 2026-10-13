@@ -42,8 +42,9 @@ class App(tk.Tk):
         from .defender import find_mpcmdrun
         self.local_clamav = LocalClamav()
         self.clamav_offer = manifest() is not None
+        from . import privacy
         self.has_defender = find_mpcmdrun() is not None
-        self.use_defender = tk.BooleanVar(value=self.has_defender)
+        self.use_defender = tk.BooleanVar(value=self.has_defender and privacy.defender_enabled())
         self.clamav_state = tk.StringVar()
         self.header = tk.StringVar()
         self.last_threats = 0
@@ -64,7 +65,10 @@ class App(tk.Tk):
         self._refresh_header()
         self.after(100, self._poll)
         self.app_update = None
-        if self.auto_check.get():
+        if privacy.needs_first_run():
+            # Premiere ouverture : la politique de confidentialite d'abord, aucune connexion avant
+            self.after(200, lambda: PrivacyWindow(self))
+        elif self.auto_check.get():
             threading.Thread(target=self._check_app_update, daemon=True).start()
         if scan:  # "Analyser avec FreeAV" depuis le clic droit de l'Explorateur
             self.after(400, self._start_scan)
@@ -110,7 +114,7 @@ class App(tk.Tk):
         engines.pack(fill="x")
         ttk.Label(engines, text="Moteurs : signatures FreeAV").pack(side="left")
         defender = ttk.Checkbutton(engines, text="+ 2e avis Microsoft Defender",
-                                   variable=self.use_defender)
+                                   variable=self.use_defender, command=self._toggle_defender)
         defender.pack(side="left", padx=10)
         if not self.has_defender:
             defender.state(["disabled"])
@@ -124,6 +128,8 @@ class App(tk.Tk):
                         variable=self.realtime, command=self._toggle_realtime).pack(side="left")
         ttk.Button(shield, text="Protection automatique...",
                    command=lambda: ScheduleWindow(self)).pack(side="right")
+        ttk.Button(shield, text="Confidentialite...",
+                   command=lambda: PrivacyWindow(self)).pack(side="right", padx=6)
         ttk.Checkbutton(shield, text="Chercher les nouvelles versions", variable=self.auto_check,
                         command=self._toggle_auto_check).pack(side="right", padx=10)
 
@@ -192,10 +198,10 @@ class App(tk.Tk):
     def _refresh_header(self):
         if self.last_threats:
             text, tone = f"Attention : {self.last_threats} menace(s) trouvee(s) lors de la derniere analyse", "danger"
-        elif self.realtime.get():
-            text, tone = "Votre PC est protege : protection en temps reel active", "ok"
-        elif self.background:
-            text, tone = "Votre PC est protege : FreeAV surveille en arriere-plan", "ok"
+        elif self.realtime.get() or self.background:
+            # FreeAV ne surveille que ces dossiers : il ne remplace pas l'antivirus de Windows
+            text, tone = ("Protection FreeAV active (Telechargements, Bureau, cles USB) : "
+                          "gardez Microsoft Defender active"), "ok"
         else:
             text, tone = "Protection en temps reel desactivee : cochez-la ci-dessous", "warn"
         bg, fg = COLORS[tone]
@@ -255,6 +261,13 @@ class App(tk.Tk):
         if self.auto_check.get() and not self.app_update:
             threading.Thread(target=self._check_app_update, daemon=True).start()
 
+    def _toggle_defender(self):
+        from . import privacy
+        try:
+            privacy.set_defender(self.use_defender.get())
+        except OSError as exc:
+            messagebox.showerror("FreeAV", f"Reglage non enregistre : {exc}", parent=self)
+
     def _check_app_update(self):
         from . import selfupdate
         try:
@@ -310,10 +323,17 @@ class App(tk.Tk):
     def _install_app(self):
         from . import installer
         from .repair import System
+        system = System()
+        if not messagebox.askyesno(
+                "FreeAV", "Installer FreeAV sur ce PC ? FreeAV va faire ces changements :\n- "
+                + "\n- ".join(installer.planned_changes(system))
+                + "\n\nRien d'autre n'est modifie. La protection en temps reel et l'analyse "
+                "quotidienne restent a activer vous-meme.", parent=self):
+            return
 
         def work():
             try:
-                done = installer.install(System())
+                done = installer.install(system)
                 msg = ("FreeAV est installe :\n- " + "\n- ".join(done)
                        + "\n\nVous pouvez l'ouvrir depuis le menu Demarrer ou le Bureau.")
             except Exception as exc:
@@ -701,7 +721,57 @@ class ScheduleWindow(tk.Toplevel):
             messagebox.showerror("FreeAV", str(exc), parent=self)
             return
         self._refresh()
+        clamav = self.master.local_clamav
+        if clamav.installed() and messagebox.askyesno(
+                "FreeAV", "Retirer aussi ClamAV et ses signatures (environ 450 Mo) ?\n\n"
+                f"Dossier : {clamav.root}", parent=self):
+            clamav.uninstall()
+            done = list(done) + ["ClamAV et ses signatures retires"]
+            self.master._refresh_engines()
         messagebox.showinfo("FreeAV", "\n".join(done) or "Rien a retirer.", parent=self)
+
+
+class PrivacyWindow(tk.Toplevel):
+    """Politique de confidentialite (premiere ouverture et bouton Confidentialite...)."""
+
+    def __init__(self, app: App):
+        from . import privacy
+        super().__init__(app)
+        self.app = app
+        self.title("FreeAV - Confidentialite")
+        self.resizable(False, False)
+        self.transient(app)
+        body = ttk.Frame(self, padding=14)
+        body.pack(fill="both")
+        ttk.Label(body, wraplength=480, justify="left", text=privacy.SUMMARY).pack(anchor="w")
+        link = ttk.Label(body, text=f"Politique complete : {privacy.PRIVACY_URL}",
+                         foreground="#1a5fb4", cursor="hand2")
+        link.pack(anchor="w", pady=(8, 4))
+        link.bind("<Button-1>", lambda e: __import__("webbrowser").open(privacy.PRIVACY_URL))
+        self.updates = tk.BooleanVar(value=app.auto_check.get())
+        self.defender = tk.BooleanVar(value=app.use_defender.get())
+        ttk.Checkbutton(body, text="Chercher les nouvelles versions de FreeAV (github.com)",
+                        variable=self.updates).pack(anchor="w", pady=(8, 0))
+        box = ttk.Checkbutton(body, text="2e avis Microsoft Defender pendant les analyses",
+                              variable=self.defender)
+        box.pack(anchor="w")
+        if not app.has_defender:
+            box.state(["disabled"])
+        ttk.Button(body, text="Valider", command=self._accept).pack(anchor="e", pady=(10, 0))
+        self.protocol("WM_DELETE_WINDOW", self._accept)
+        self.grab_set()
+
+    def _accept(self):
+        from . import privacy
+        try:
+            privacy.accept(self.updates.get(), self.defender.get())
+        except OSError as exc:
+            messagebox.showerror("FreeAV", f"Reglages non enregistres : {exc}", parent=self)
+        self.app.auto_check.set(self.updates.get())
+        self.app.use_defender.set(self.defender.get() and self.app.has_defender)
+        if self.updates.get() and not self.app.app_update:
+            threading.Thread(target=self.app._check_app_update, daemon=True).start()
+        self.destroy()
 
 
 def run(scan: str | None = None):
