@@ -61,6 +61,30 @@ def focused(widget: tk.Misc):
         return None
 
 
+class Timers:
+    """Minuteries (animations, delais) annulees quand le widget est detruit : sans cela, Tk
+    signale une « commande inconnue » quand une minuterie d'un ecran ferme se declenche."""
+
+    def later(self, ms: int, fn, *args) -> str:
+        jobs = self.__dict__.setdefault("_jobs", set())
+        job = ""
+
+        def run():
+            jobs.discard(job)
+            fn(*args)
+        job = self.after(ms, run)
+        jobs.add(job)
+        return job
+
+    def destroy(self):
+        for job in self.__dict__.pop("_jobs", ()):
+            try:
+                self.after_cancel(job)
+            except tk.TclError:
+                pass
+        super().destroy()
+
+
 def _rgb(color: str) -> tuple:
     return tuple(int(color[i:i + 2], 16) for i in (1, 3, 5))
 
@@ -244,7 +268,7 @@ class Field(tk.Frame):
         self.entry.icursor("end")
 
 
-class Button(tk.Canvas):
+class Button(Timers, tk.Canvas):
     """Bouton arrondi : principal (vert), secondaire ou danger, avec etat « en cours »."""
 
     STYLES = {
@@ -343,7 +367,7 @@ class Button(tk.Canvas):
         if self.spinner and self.winfo_exists():
             start = float(self.itemcget(self.spinner, "start"))
             self.itemconfig(self.spinner, start=(start - 24) % 360)
-            self.after(40, self._spin)
+            self.later(40, self._spin)
 
 
 class Link(tk.Label):
@@ -398,7 +422,7 @@ class Notice(tk.Frame):
         return self.label.cget("text")
 
 
-class CodeBoxes(tk.Frame):
+class CodeBoxes(Timers, tk.Frame):
     """Six cases pour le code a usage unique : saisie chiffre par chiffre, collage accepte,
     validation automatique au sixieme chiffre."""
 
@@ -475,7 +499,7 @@ class CodeBoxes(tk.Frame):
     def _check(self):
         code = self.get()
         if len(code) == self.count and code.isdigit():
-            self.after(80, lambda: self.on_complete(code) if self.winfo_exists() else None)
+            self.later(80, self.on_complete, code)
 
     def set(self, code: str):
         digits = (code + " " * self.count)[:self.count]
@@ -499,7 +523,7 @@ class CodeBoxes(tk.Frame):
         self._paint()
 
 
-class Countdown(tk.Canvas):
+class Countdown(Timers, tk.Canvas):
     """Anneau qui montre le temps restant avant que le code OTP change (30 secondes)."""
 
     def __init__(self, parent):
@@ -517,7 +541,7 @@ class Countdown(tk.Canvas):
         color = WARN if left <= 5 else ACCENT
         self.itemconfig(self.arc, extent=-max(1, 360 * left / login.OTP_STEP), outline=color)
         self.itemconfig(self.label, text=str(math.ceil(left)))
-        self.after(250, self._tick)
+        self.later(250, self._tick)
 
 
 class StrengthMeter(tk.Frame):
@@ -561,7 +585,7 @@ class StrengthMeter(tk.Frame):
 class QrView(tk.Canvas):
     """QR code dessine (modules noirs sur carte blanche, marge de 4 modules)."""
 
-    def __init__(self, parent, text: str, target: int = 180):
+    def __init__(self, parent, text: str, target: int = 200):
         matrix = qrcode.make(text)
         n = len(matrix) + 8
         module = max(3, target // n)
@@ -584,7 +608,7 @@ class QrView(tk.Canvas):
         self.size = size
 
 
-class Switch(tk.Canvas):
+class Switch(Timers, tk.Canvas):
     """Interrupteur anime."""
 
     def __init__(self, parent, value: bool = True, on_change=None):
@@ -617,7 +641,7 @@ class Switch(tk.Canvas):
             self.pos = target
         self._place()
         if steps > 1:
-            self.after(16, self._animate, target, steps - 1)
+            self.later(16, self._animate, target, steps - 1)
 
 
 class CheckBox(tk.Frame):
@@ -715,12 +739,12 @@ def brand_background(height: int) -> str:
     return _backgrounds[height]
 
 
-class Brand(tk.Canvas):
+class Brand(Timers, tk.Canvas):
     """Panneau de gauche : degrade avec halos, bouclier anime, nom et points forts."""
 
     FEATURES = (("bolt", "Protection en temps réel", "Téléchargements, Bureau, clés USB"),
                 ("shield", "Analyse rapide en un clic", "Signatures, YARA et ClamAV"),
-                ("cloud-off", "Connexion 100 % locale", "Aucun compte en ligne, rien n'est envoyé"))
+                ("cloud-off", "Connexion 100 % locale", "Aucun compte en ligne"))
 
     def __init__(self, parent):
         super().__init__(parent, width=BRAND_W, height=HEIGHT, highlightthickness=0, bd=0,
@@ -770,7 +794,7 @@ class Brand(tk.Canvas):
             self.coords(ring, self.cx - r, self.cy - r, self.cx + r, self.cy + r)
             self.itemconfig(ring, outline=mix(ACCENT, self.ring_bg, 0.25 + 0.75 * t),
                             width=2.5 - 1.5 * t)
-        self.after(40, self._animate)
+        self.later(40, self._animate)
 
 
 # -- fenetre ----------------------------------------------------------------------------
@@ -784,7 +808,7 @@ def _set_icon(window: tk.Tk) -> None:
             pass
 
 
-class AccessWindow(tk.Toplevel):
+class AccessWindow(Timers, tk.Toplevel):
     """Fenetre de connexion. Modes :
       - "open" : au lancement de FreeAV (result True si connecte) ;
       - "lock" : fenetre principale verrouillee (la croix reduit la fenetre) ;
@@ -823,7 +847,7 @@ class AccessWindow(tk.Toplevel):
         self.bind("<KP_Enter>", self._enter)
         if mode not in ("open", "lock"):
             self.bind("<Escape>", lambda e: self.close())
-        self.after(60, self._to_front)
+        self.later(60, self._to_front)
         {"open": self.show_login, "lock": self.show_login, "manage": self.show_login,
          "setup": self.show_account, "offer": self.show_offer}[mode]()
 
@@ -842,7 +866,7 @@ class AccessWindow(tk.Toplevel):
         self.content = tk.Frame(self.body, bg=SURFACE)
         self.content.pack(expand=True, fill="x")
         self.primary = None
-        self.after_idle(self._fit)
+        self.later(0, self._fit)
         return self.content
 
     def _fit(self):
@@ -862,7 +886,7 @@ class AccessWindow(tk.Toplevel):
         def go():
             if widget.winfo_exists():
                 widget.focus()
-        self.after(80, go)
+        self.later(80, go)
 
     def steps(self, parent, current: int, total: int) -> None:
         row = tk.Frame(parent, bg=SURFACE)
@@ -933,7 +957,7 @@ class AccessWindow(tk.Toplevel):
                 self.jobs.put((done, button, None, exc))
 
         threading.Thread(target=target, daemon=True).start()
-        self.after(30, self._poll)
+        self.later(30, self._poll)
 
     def _poll(self):
         if not self.winfo_exists():
@@ -941,7 +965,7 @@ class AccessWindow(tk.Toplevel):
         try:
             done, button, result, exc = self.jobs.get_nowait()
         except queue.Empty:
-            self.after(30, self._poll)
+            self.later(30, self._poll)
             return
         self.busy = False
         if button is not None and button.winfo_exists():
@@ -964,7 +988,7 @@ class AccessWindow(tk.Toplevel):
                 return
             if i < len(offsets):
                 self.geometry(f"+{x + offsets[i]}+{y}")
-                self.after(28, step, i + 1)
+                self.later(28, step, i + 1)
             else:
                 self._shaking = False
         step()
@@ -998,7 +1022,7 @@ class AccessWindow(tk.Toplevel):
                 notice.show("Vous pouvez réessayer.", "info")
                 return
             notice.show(f"Trop d'essais. Réessayez dans {left} s.", "warn")
-            self.after(1000, tick, left - 1)
+            self.later(1000, tick, left - 1)
         tick()
 
     def finish(self, result) -> None:
@@ -1038,7 +1062,7 @@ class AccessWindow(tk.Toplevel):
                 c.itemconfig(mark, state="normal")
                 if t >= 1:
                     return
-            c.after(22, step, i + 1)
+            self.later(22, step, i + 1)
         step()
         return c
 
@@ -1161,7 +1185,7 @@ class AccessWindow(tk.Toplevel):
         if result.recovery_used:
             self.button(c, "Continuer", lambda: self.finish(True))
         else:
-            self.after(750, lambda: self.finish(True) if self.winfo_exists() else None)
+            self.later(750, self.finish, True)
 
     # - mot de passe oublie -
 

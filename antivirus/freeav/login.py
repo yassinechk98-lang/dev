@@ -206,10 +206,11 @@ def check_totp(secret: str, code: str, at: float | None = None) -> bool:
 
 
 def otp_uri(secret: str, nickname: str) -> str:
-    """Adresse otpauth:// a mettre dans le QR code (ou a saisir a la main)."""
+    """Adresse otpauth:// a mettre dans le QR code (ou a saisir a la main). SHA-1, 6 chiffres
+    et 30 secondes sont les valeurs par defaut des applications : les omettre donne un QR code
+    plus petit, donc plus facile a scanner."""
     label = quote(f"{ISSUER}:{nickname}", safe=":")
-    return (f"otpauth://totp/{label}?secret={secret}&issuer={ISSUER}"
-            f"&algorithm=SHA1&digits={OTP_DIGITS}&period={OTP_STEP}")
+    return f"otpauth://totp/{label}?secret={secret}&issuer={ISSUER}"
 
 
 def format_secret(secret: str) -> str:

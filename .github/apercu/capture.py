@@ -99,9 +99,23 @@ def setup():
     state.update(secret=secret, codes=codes)
 
 
+def taskbar(window):
+    """La fenetre a-t-elle un bouton dans la barre des taches ? (pas de proprietaire, ou
+    WS_EX_APPWINDOW, et pas WS_EX_TOOLWINDOW)."""
+    import ctypes
+    user32 = ctypes.windll.user32
+    user32.GetParent.restype = ctypes.c_void_p
+    hwnd = user32.GetParent(window.winfo_id()) or window.winfo_id()  # cadre de Tk
+    owner = user32.GetWindow(ctypes.c_void_p(hwnd), 4)  # GW_OWNER
+    style = user32.GetWindowLongW(ctypes.c_void_p(hwnd), -20)  # GWL_EXSTYLE
+    print(f"barre des taches : proprietaire={owner} appwindow={bool(style & 0x40000)} "
+          f"toolwindow={bool(style & 0x80)}", flush=True)
+
+
 def sign_in():
     w = login_gui.AccessWindow(root, "open")
     shot(w, "06-connexion")
+    taskbar(w)
     w.f_nick.set("Yassine")
     w.f_pass.set("pas-le-bon-mot-de-passe")
     w.submit_login()
@@ -129,6 +143,9 @@ def forgot():
     w.f_new.set("trois-mots-faciles")
     w.f_confirm.set("trois-mots-faciles")
     shot(w, "11-mot-de-passe-oublie")
+    w.submit_forgot()
+    wait(lambda: not w.busy and w.notice.text)
+    shot(w, "11b-erreur-agrandie")
     w.show_no_code()
     shot(w, "12-plus-aucun-code")
     w.destroy()

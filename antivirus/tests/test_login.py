@@ -199,7 +199,9 @@ def test_damaged_file_is_ignored(path):
 def test_otp_uri_and_its_qr_code():
     secret = login.new_otp_secret()
     uri = login.otp_uri(secret, "Yassine")
-    assert uri.startswith(f"otpauth://totp/FreeAV:Yassine?secret={secret}&issuer=FreeAV")
+    assert uri == f"otpauth://totp/FreeAV:Yassine?secret={secret}&issuer=FreeAV"
+    assert (login.OTP_DIGITS, login.OTP_STEP) == (6, 30)  # les valeurs par defaut omises
+    assert len(qrcode.make(uri)) == 37  # version 5 : gros modules, facile a scanner
     assert len(login.format_secret(secret).split()) == 8
     matrix = qrcode.make(login.otp_uri(secret, "x" * 32))
     assert len(matrix) <= 4 * qrcode.MAX_VERSION + 17
