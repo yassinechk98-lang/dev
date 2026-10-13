@@ -7,25 +7,27 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import heuristics
 from .clamav import ClamdClient, ClamdError
 from .signatures import SignatureDB
 from .yara_engine import YaraEngine, YaraScanError
 
 MAX_SIZE = 200 * 1024 * 1024  # fichiers plus gros ignores (200 Mo)
+SUSPECT_ENGINES = {"yara", "heuristique"}
 
 
 @dataclass
 class Detection:
     path: Path
     threat: str
-    engine: str  # "signatures", "yara", "clamav" ou "defender"
+    engine: str  # "signatures", "yara", "heuristique", "clamav" ou "defender"
     sha256: str = ""
 
     @property
     def suspect(self) -> bool:
-        """Les regles YARA reperent des motifs suspects, pas des malwares certains :
-        leurs detections ne sont jamais mises en quarantaine automatiquement."""
-        return self.engine == "yara"
+        """Les regles YARA et les heuristiques reperent des motifs suspects, pas des malwares
+        certains : leurs detections ne sont jamais mises en quarantaine automatiquement."""
+        return self.engine in SUSPECT_ENGINES
 
 
 @dataclass
@@ -110,8 +112,9 @@ class Scanner:
 
     def __init__(self, db: SignatureDB, clamd: ClamdClient | None = None,
                  max_size: int = MAX_SIZE, yara: YaraEngine | None = None,
-                 batch_engines: list | None = None):
+                 batch_engines: list | None = None, heuristics: bool = True):
         self.db = db
+        self.heuristics = heuristics
         self.clamd = clamd
         self.yara = yara
         self.max_size = max_size
@@ -135,6 +138,8 @@ class Scanner:
             return Detection(path, threat, "clamav", sha256)
         if self.yara and (threat := self.yara.match(path)):
             return Detection(path, threat, "yara", sha256)
+        if self.heuristics and (threat := heuristics.check(path)):
+            return Detection(path, threat, "heuristique", sha256)
         return None
 
     def scan(self, targets: list[Path], exclude: set[Path] | None = None,

@@ -10,6 +10,12 @@ FreeAV.exe contient le moteur YARA (yara-python, version figee dans `requirement
   (`freeav/data/signatures.txt`). Les bases de hachage ClamAV (`.hdb`, `.hsb`) se chargent avec `--db`.
 - **Moteur ClamAV optionnel** : si le demon `clamd` tourne, FreeAV lui envoie chaque fichier
   (protocole INSTREAM) et profite de ses millions de signatures.
+- **Pieges courants reperes sans signature** (heuristiques) : double extension qui cache un
+  programme (`facture.pdf.exe`), raccourci `.lnk` qui lance PowerShell cache ou mshta, script
+  Windows telecharge (`.js`, `.vbs`, `.hta`...) qui telecharge et execute autre chose, document
+  Office telecharge dont la macro se lance a l'ouverture. Les scripts et documents ne sont
+  examines que s'ils portent la marque Internet de Windows. Ces resultats sont "suspects" :
+  signales, jamais mis en quarantaine automatiquement.
 - **Regles YARA open source** : FreeAV applique les regles de la communaute. Nous conseillons le
   paquet **core** de [YARA Forge](https://github.com/YARAHQ/yara-forge), filtre pour limiter les faux
   positifs (0 fausse alerte sur 954 fichiers sains lors de nos essais). Les detections YARA sont
