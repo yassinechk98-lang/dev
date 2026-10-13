@@ -60,6 +60,7 @@ FreeAV.exe contient le moteur YARA (yara-python, version figee dans `requirement
   malwares arrivent ou s'installent le plus souvent, en quelques minutes.
 - **Ligne de commande** et **interface graphique** (Tkinter), avec un bandeau qui dit en un coup
   d'oeil si le PC est protege.
+- Interface disponible en anglais (choix **Langue / Language** dans la fenetre principale).
 
 ## Reparer mon PC
 
