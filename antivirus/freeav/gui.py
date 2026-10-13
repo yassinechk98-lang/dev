@@ -61,6 +61,8 @@ class App(tk.Tk):
         from . import selfupdate
         self.auto_check = tk.BooleanVar(value=selfupdate.auto_check_enabled())
         self._build()
+        from . import login_gui
+        login_gui.attach(self, offer_now=scan is None)  # boutons Connexion... et Verrouiller
         self._refresh_engines()
         self._refresh_header()
         self.after(100, self._poll)
@@ -772,10 +774,14 @@ class PrivacyWindow(tk.Toplevel):
         if self.updates.get() and not self.app.app_update:
             threading.Thread(target=self.app._check_app_update, daemon=True).start()
         self.destroy()
+        from . import login_gui
+        self.app.after(300, lambda: login_gui.offer(self.app))  # une seule fois
 
 
 def run(scan: str | None = None):
-    App(scan=scan).mainloop()
+    from . import login_gui
+    if login_gui.unlock():  # pseudo et mot de passe d'abord, si la connexion est activee
+        App(scan=scan).mainloop()
 
 
 if __name__ == "__main__":

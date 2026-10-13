@@ -63,6 +63,14 @@
   expose a un programme malveillant deja actif sous le meme compte, qui aurait pu remplacer
   `FreeAV.exe` lui-meme. Lancez FreeAV normalement, sauf pour une reparation qui le demande.
 
+- **La connexion a FreeAV reste sur le PC** (optionnelle, bouton **Connexion...**) : aucun compte
+  en ligne. `~/.freeav/login.json` (`0600`) garde une empreinte scrypt du mot de passe (jamais le
+  mot de passe lui-meme), celles des 8 codes de secours et la cle OTP. Les comparaisons se font en
+  temps constant, le message d'erreur ne dit pas si c'est le pseudo ou le mot de passe qui est faux,
+  un code OTP ne sert qu'une fois et les essais sont freines (30 secondes apres 5 erreurs, puis le
+  double, 15 minutes au plus). Le QR code est dessine par FreeAV lui-meme : la cle OTP ne passe par
+  aucun service en ligne.
+
 ## Securite du code (GitHub)
 
 - **CodeQL** analyse le code a chaque PR et chaque semaine (`.github/workflows/codeql.yml`).
@@ -97,6 +105,9 @@ connus (empreintes, regles YARA, ClamAV) : un malware tout nouveau ou cible peut
 temps reel ne surveille que Telechargements et Bureau, apres l'arrivee des fichiers, et il ne protege pas contre le phishing, les mots de passe voles
 ou les failles du systeme. Gardez votre systeme a jour, faites des sauvegardes hors ligne et activez
 la double authentification sur vos comptes.
+
+La connexion a FreeAV ne protege que l'acces a sa fenetre : elle ne chiffre rien, et quelqu'un qui
+utilise deja votre session Windows peut la retirer en supprimant `~/.freeav/login.json`.
 
 ## Signaler une faille
 

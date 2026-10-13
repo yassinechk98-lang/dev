@@ -1,0 +1,57 @@
+# Temporaire (branche freeav-connexion seulement) : tests et captures des ecrans de connexion
+# sur Windows. Les resultats vont sur la branche freeav-connexion-apercu.
+name: Apercu connexion (temporaire)
+
+on:
+  push:
+    branches: [freeav-connexion]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: connexion-apercu
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Installe les outils (versions et empreintes figees)
+        run: pip install --require-hashes -r antivirus/requirements-build.txt
+
+      - name: Tests sous Windows
+        id: tests
+        continue-on-error: true
+        shell: bash
+        working-directory: antivirus
+        run: |
+          mkdir -p ../apercu
+          python -m pytest -q -rfEs --basetemp "$RUNNER_TEMP/freeav-tests" 2>&1 | tee ../apercu/tests.txt
+
+      - name: Captures des ecrans
+        id: captures
+        continue-on-error: true
+        shell: bash
+        run: python .github/apercu/capture.py apercu 2>&1 | tee apercu/captures.txt
+
+      - name: Publie les resultats
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          cd apercu
+          git init -q -b apercu
+          git add -A
+          git -c user.name=apercu -c user.email=apercu@localhost commit -qm "Apercu de ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" apercu:freeav-connexion-apercu
+
+      - name: Echec si un test ou une capture a echoue
+        if: steps.tests.outcome == 'failure' || steps.captures.outcome == 'failure'
+        run: exit 1
