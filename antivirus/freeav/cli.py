@@ -110,7 +110,8 @@ def cmd_scan(args) -> int:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 2
     quarantine = Quarantine(Path(args.quarantine_dir))
-    names = {"clamav": "ClamAV integre", "defender": "Microsoft Defender"}
+    names = {"clamav": "ClamAV integre", "defender": "Microsoft Defender",
+             "heuristique": "Heuristique FreeAV"}
     print(f"FreeAV {__version__} : {len(scanner.db)} signatures chargees"
           + (f", {len(scanner.yara)} fichiers de regles YARA" if scanner.yara else "")
           + (", moteur ClamAV actif" if scanner.clamd else "")

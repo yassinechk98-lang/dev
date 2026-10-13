@@ -10,7 +10,7 @@ name: FreeAV pour Windows
 #   de la construction (onglet Actions), pour validation.
 on:
   push:
-    branches: [main, antivirus-prototype, freeav-app, freeav-maj, freeav-version, freeav-licence, freeav-rapide, freeav-publication, freeav-confidentialite]
+    branches: [main, antivirus-prototype, freeav-app, freeav-maj, freeav-version, freeav-licence, freeav-rapide, freeav-publication, freeav-confidentialite, freeav-heuristiques, freeav-anglais]
     paths: ["antivirus/**", ".github/workflows/build-windows.yml"]
   workflow_dispatch:
 
