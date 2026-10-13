@@ -3,6 +3,6 @@
 #   uv pip compile requirements-build.in --universal --python-version 3.12 --generate-hashes -o requirements-build.txt
 pyinstaller==6.16.0
 pillow==11.3.0
-pytest==8.4.2
+pytest==9.1.1
 # Moteur YARA inclus dans FreeAV.exe (licences dans THIRD_PARTY_NOTICES.txt)
 yara-python==4.5.4
