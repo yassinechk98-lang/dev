@@ -81,8 +81,12 @@
   modifiables sans droits) : la nouvelle version prend le relais a la prochaine session. Limite : l'empreinte vient
   de la meme page GitHub que le programme ; FreeAV fait donc confiance au compte GitHub du projet,
   comme pour le telechargement direct (FreeAV.exe n'est pas signe).
-- **Outils de construction figes** (`requirements-build.txt`, seul fichier installe par la CI Windows) pour
-  FreeAV.exe, y compris yara-python et pytest.
+- **Outils de construction figes avec leurs empreintes** : la CI installe `requirements-build.txt`
+  avec `pip --require-hashes` (versions choisies dans `requirements-build.in`, y compris yara-python
+  et pytest), et les actions GitHub des workflows FreeAV sont figees par commit.
+- **Publication seulement depuis main** : les autres branches et les lancements manuels ne
+  produisent qu'un artefact de construction. Si Microsoft Defender signale FreeAV.exe, la
+  publication est bloquee.
 - **Dependabot** propose les mises a jour de securite des dependances et des actions GitHub.
 - Les workflows n'ont que les droits en lecture dont ils ont besoin.
 

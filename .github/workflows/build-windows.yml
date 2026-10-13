@@ -3,21 +3,16 @@
 
 name: FreeAV pour Windows
 
-# Construit FreeAV.exe sur une vraie machine Windows, le verifie, puis le publie.
-# - main et antivirus-prototype : release "freeav-test", le lien public qui ne change jamais ;
-# - autres branches (travail en cours) : release "freeav-apercu", pour validation avant publication.
-# Un lancement manuel avec canal=test publie la branche choisie au lien public.
+# Construit FreeAV.exe sur une vraie machine Windows et le verifie.
+# - Seul un push sur main publie, dans la release "freeav-test" (le lien public qui ne change
+#   jamais), et seulement si Microsoft Defender ne signale rien dans FreeAV.exe ;
+# - les autres branches et les lancements manuels ne publient rien : l'exe reste un artefact
+#   de la construction (onglet Actions), pour validation.
 on:
   push:
-    branches: [main, antivirus-prototype, freeav-app, freeav-maj, freeav-version, freeav-licence, freeav-rapide]
+    branches: [main, antivirus-prototype, freeav-app, freeav-maj, freeav-version, freeav-licence, freeav-rapide, freeav-publication, freeav-confidentialite]
     paths: ["antivirus/**", ".github/workflows/build-windows.yml"]
   workflow_dispatch:
-    inputs:
-      canal:
-        description: "test (lien public) ou apercu"
-        default: apercu
-        type: choice
-        options: [apercu, test]
 
 permissions:
   contents: read
@@ -30,7 +25,7 @@ env:
   CLAMAV_VERSION: "1.4.3"
   # Empreinte du paquet Windows officiel de Cisco Talos (clamav-1.4.3.win.x64.zip)
   CLAMAV_SHA256: "5c86a6ed17e45e5c14c9c7c7b58cfaabcdee55a195991439bb6b6c6618827e6c"
-  CANAL: ${{ (github.event_name == 'workflow_dispatch' && inputs.canal == 'test' || github.ref_name == 'main' || github.ref_name == 'antivirus-prototype') && 'freeav-test' || 'freeav-apercu' }}
+  CANAL: freeav-test
 
 jobs:
   build:
@@ -39,14 +34,14 @@ jobs:
       run:
         working-directory: antivirus
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
 
-      - name: Installe les outils
-        run: pip install -r requirements-build.txt
+      - name: Installe les outils (versions et empreintes figees)
+        run: pip install --require-hashes -r requirements-build.txt
 
       - name: Recupere ClamAV officiel (Cisco Talos) et verifie son empreinte
         shell: pwsh
@@ -106,6 +101,7 @@ jobs:
           packaging/freeav_app.py
 
       - name: Fait analyser FreeAV.exe par Microsoft Defender
+        id: defender
         shell: pwsh
         run: |
           # Defender du serveur, avec ses signatures a jour, analyse l'exe construit. On verifie
@@ -135,12 +131,13 @@ jobs:
             $menace = ($sortie | Select-String -Pattern 'Threat\s*:\s*(.+)$' | Select-Object -First 1).Matches.Groups[1].Value
             $verdict = "Microsoft Defender (signatures $signatures) : FreeAV.exe signale ($menace, code $code)"
             Write-Host "::warning title=Microsoft Defender::$verdict"
+            "signale=oui" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
           }
           Write-Host $verdict
           "### $verdict" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
           New-Item -ItemType Directory -Force dist | Out-Null
           Set-Content -Encoding utf8NoBOM dist/defender.txt $verdict
-          $global:LASTEXITCODE = 0  # un signalement est rapporte, il ne bloque pas la construction
+          $global:LASTEXITCODE = 0  # un signalement bloque la publication, a la fin de la construction
 
       - name: Verifie FreeAV.exe (detection et fichier sain)
         shell: pwsh
@@ -248,7 +245,7 @@ jobs:
       - name: Verifie les mentions des licences tierces
         run: python packaging/check_notices.py dist/FreeAV.exe THIRD_PARTY_NOTICES.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: FreeAV-windows
           path: |
@@ -259,13 +256,25 @@ jobs:
             antivirus/dist/FreeAV.json
             antivirus/dist/defender.txt
 
+      # L'exe reste dans les artefacts (pour un signalement de faux positif a Microsoft),
+      # mais il n'est pas publie.
+      - name: Bloque la publication si Microsoft Defender signale FreeAV.exe
+        if: steps.defender.outputs.signale == 'oui'
+        shell: pwsh
+        run: |
+          Write-Host "::error title=Microsoft Defender::FreeAV.exe signale par Defender : publication bloquee ($(Get-Content dist/defender.txt))"
+          exit 1
+
   publish:
     needs: build
+    # Seul main publie (comme l'annonce la politique de signature du code) ; un lancement manuel
+    # ou une autre branche s'arrete aux artefacts.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: FreeAV-windows
 
@@ -274,15 +283,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          # Ancienne pre-version des branches, plus utilisee : elle contenait encore le paquet
+          # ClamAV que FreeAV ne republie plus. Seule cette pre-version FreeAV est visee.
+          gh release delete freeav-apercu --cleanup-tag --yes || true
           gh release delete "$CANAL" --cleanup-tag --yes || true
           URL="https://github.com/${GH_REPO}/releases/download/${CANAL}/FreeAV.exe"
-          if [ "$CANAL" = freeav-test ]; then
-            TITLE="FreeAV - version de test"
-          else
-            TITLE="FreeAV - apercu en cours de validation (ne pas diffuser)"
-          fi
+          TITLE="FreeAV - version de test"
           {
-            echo "Construit automatiquement depuis la branche ${{ github.ref_name }} (commit ${{ github.sha }})."
+            echo "Construit automatiquement depuis la branche main (commit ${{ github.sha }})."
             echo
             echo "Telechargement direct : ${URL}"
             echo
@@ -294,6 +302,7 @@ jobs:
             echo
             echo "FreeAV est un logiciel libre (GPL-3.0-or-later, voir LICENSE.txt). Code source de cette version : https://github.com/${GH_REPO}/tree/${{ github.sha }}/antivirus"
             echo "Licences des logiciels tiers inclus dans FreeAV.exe : THIRD_PARTY_NOTICES.txt"
+            echo "Code signing policy / Politique de signature du code : https://freeav-antivirus-gratuit.netlify.app/signature.html"
             echo
             echo "ClamAV n'est pas fourni ici : « Installer ClamAV » telecharge ClamAV ${CLAMAV_VERSION} directement depuis la release officielle de Cisco Talos (GPL-2.0, code source : https://github.com/Cisco-Talos/clamav/releases/tag/clamav-${CLAMAV_VERSION}), sans son module RAR non libre."
             echo "Les anciennes copies de FreeAV cherchaient ClamAV ici et ne le trouvent plus : si « Installer ClamAV » echoue, mettez d'abord FreeAV a jour (« Mettre a jour FreeAV ») ou retelechargez-le."
