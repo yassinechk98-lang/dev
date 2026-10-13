@@ -1,0 +1,55 @@
+...........s........................ss....s...s.......s................. [ 48%]
+..s..................................................................... [ 96%]
+......                                                                   [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] tests\test_engines.py:253: paquet ClamAV officiel fourni par la CI Windows
+SKIPPED [1] tests\test_freeav.py:227: droits Unix
+SKIPPED [1] tests\test_freeav.py:236: liens symboliques Unix
+SKIPPED [1] tests\test_freeav.py:323: tubes nommes Unix
+SKIPPED [1] tests\test_freeav.py:375: droits Unix
+SKIPPED [1] tests\test_freeav.py:442: droits Unix
+SKIPPED [1] tests\test_login_gui.py:84: pas d'affichage : Can't find a usable tk.tcl in the following directories: 
+    C:/hostedtoolcache/windows/Python/3.12.10/x64/tcl/tcl8.6/tk8.6 C:/hostedtoolcache/windows/Python/3.12.10/x64/tcl/tk8.6 C:/hostedtoolcache/windows/Python/3.12.10/lib/tk8.6 C:/hostedtoolcache/windows/Python/3.12.10/lib/tk8.6 C:/hostedtoolcache/windows/Python/lib/tk8.6 C:/hostedtoolcache/windows/Python/3.12.10/library
+
+C:/hostedtoolcache/windows/Python/3.12.10/x64/tcl/tk8.6/tk.tcl: couldn't read file "C:/hostedtoolcache/windows/Python/3.12.10/x64/tcl/tk8.6/msgs/en.msg": no such file or directory
+couldn't read file "C:/hostedtoolcache/windows/Python/3.12.10/x64/tcl/tk8.6/msgs/en.msg": no such file or directory
+    while executing
+"::source -encoding utf-8 C:/hostedtoolcache/windows/Python/3.12.10/x64/tcl/tk8.6/msgs/en.msg"
+    (in namespace inscope "::tk::msgcat" script line 1)
+    invoked from within
+"namespace inscope $ns [list ::source -encoding utf-8 $langfile]"
+    (procedure "Load" line 34)
+    invoked from within
+"Load $ns [PackageLocales $ns]"
+    (procedure "::msgcat::mcpackageconfig" line 46)
+    invoked from within
+"::msgcat::mcpackageconfig set mcfolder C:/hostedtoolcache/windows/Python/3.12.10/x64/tcl/tk8.6/msgs"
+    ("uplevel" body line 1)
+    invoked from within
+"uplevel 1 [list [namespace origin mcpackageconfig] set mcfolder $langdir]"
+    (procedure "::msgcat::mcload" line 2)
+    invoked from within
+"::msgcat::mcload [file join $::tk_library msgs]"
+    (in namespace eval "::tk::msgcat" script line 23)
+    invoked from within
+"namespace eval msgcat {
+	namespace export mc mcmax
+        if {[interp issafe] || [catch {package require msgcat}]} {
+            # The msgcat package..."
+    (in namespace eval "::tk" script line 3)
+    invoked from within
+"namespace eval ::tk {
+    # Set up the msgcat commands
+    namespace eval msgcat {
+	namespace export mc mcmax
+        if {[interp issafe] || [catch {p..."
+    (file "C:/hostedtoolcache/windows/Python/3.12.10/x64/tcl/tk8.6/tk.tcl" line 17)
+    invoked from within
+"source -encoding utf-8 C:/hostedtoolcache/windows/Python/3.12.10/x64/tcl/tk8.6/tk.tcl"
+    ("uplevel" body line 1)
+    invoked from within
+"uplevel #0 [list source -encoding utf-8 $file]"
+
+
+This probably means that tk wasn't installed properly.
+143 passed, 7 skipped in 15.38s

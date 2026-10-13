@@ -1,0 +1,28 @@
+ecran 1024 x 768 scaling 1.3330053300533005
+capture 01-proposition : 820x580, ecran '  NOUVEAU  '
+capture 02-creation : 820x580, ecran 'Créez votre accès'
+capture 03-qr-code : 820x580, ecran 'Scannez ce QR code'
+capture 04-codes-de-secours : 820x580, ecran 'Notez vos codes de secours'
+capture 05-termine : 820x580, ecran 'FreeAV est protégé'
+  (5.4 s)
+capture 06-connexion : 820x580, ecran 'Bon retour'
+barre des taches : proprietaire=0 appwindow=False toolwindow=False
+capture 07-erreur : 820x580, ecran 'Bon retour'
+capture 08-code-otp : 820x580, ecran 'Vérification en deux étapes'
+capture 09-code-de-secours : 820x580, ecran 'Code de secours'
+capture 10-bienvenue : 820x580, ecran 'Bienvenue, Yassine'
+  (5.3 s)
+capture 11-mot-de-passe-oublie : 820x580, ecran 'Mot de passe oublié'
+capture 11b-erreur-agrandie : 820x580, ecran 'Mot de passe oublié'
+capture 12-plus-aucun-code : 820x580, ecran 'Plus aucun code ?'
+  (3.0 s)
+capture 13-confirmer : 820x580, ecran "Confirmez que c'est vous"
+capture 14-reglages : 820x580, ecran 'Connexion à FreeAV'
+capture 15-nouveau-mot-de-passe : 820x580, ecran 'Nouveau mot de passe'
+capture 16-retirer : 820x580, ecran 'Retirer la connexion ?'
+  (4.0 s)
+capture 17-verrouille : 820x580, ecran 'FreeAV est verrouillé'
+  (1.0 s)
+capture 18-fenetre : 880x500
+  (4.5 s)
+total 23.3 s, echecs : []
